@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react';
 import { Filter, Star, MapPin, Clock, ArrowUpDown, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { useCartStore } from '../../store/cartStore';
+import { useCartStore } from '@/store/cartStore';
 
 const allStores = [
   { id: 1, name: "Sharma Kirana", price: 27, dist: 0.5, rating: 4.5, time: 10, item: "Amul Taaza Milk" },

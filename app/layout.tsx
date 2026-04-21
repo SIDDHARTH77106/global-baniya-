@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-// Yahan maine ../ ki jagah ./ kar diya hai
-import Header from "./components/layout/Header";
-import Footer from "./components/layout/Footer";
+// 🔴 Global Components Imports
+import Header from "@/components/layout/Header";
+import Footer from "@/components/layout/Footer";
+import AuthGuard from "@/components/providers/AuthGuard"; // 👈 Bouncer import kar liya
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,17 +34,22 @@ export default function RootLayout({
     >
       <body className="min-h-screen flex flex-col bg-gray-50 text-gray-900">
         
-        {/* Global Navbar */}
-        <Header />
+        {/* 🛡️ THE STRICT AUTH GUARD (Sab kuch iske andar aayega) */}
+        <AuthGuard>
+          
+          {/* Global Navbar */}
+          <Header />
 
-        {/* Main Content */}
-        <main className="flex-grow">
-          {children}
-        </main>
+          {/* Main Content */}
+          <main className="flex-grow relative">
+            {children}
+          </main>
 
-        {/* Global Footer */}
-        <Footer />
-        
+          {/* Global Footer */}
+          <Footer />
+          
+        </AuthGuard>
+
       </body>
     </html>
   );

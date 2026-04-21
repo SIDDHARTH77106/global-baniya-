@@ -1,0 +1,19 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Dekhiye, yahan se maine URL wali line hata di hai
+datasource db {
+  provider = "mysql"
+}
+
+// 🔴 YEH HAI HUMARI PEHLI TABLE (User Data ke liye)
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String   // Yahan Hashed Password aayega
+  role      String   @default("customer") // customer, retailer, wholesaler
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
