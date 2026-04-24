@@ -1,19 +1,22 @@
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
 
-// Dekhiye, yahan se maine URL wali line hata di hai
 datasource db {
   provider = "mysql"
+  // 🔴 Yahan se url hata diya hai!
 }
 
-// 🔴 YEH HAI HUMARI PEHLI TABLE (User Data ke liye)
 model User {
-  id        Int      @id @default(autoincrement())
+  id        String    @id @default(uuid())
   name      String
-  email     String   @unique
-  password  String   // Yahan Hashed Password aayega
-  role      String   @default("customer") // customer, retailer, wholesaler
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  email     String    @unique
+  phone     String?
+  password  String?
+  otp       String?
+  otpExpiry DateTime?
+  role      String    @default("customer")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
