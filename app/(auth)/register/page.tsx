@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore"; 
-import { Mail, Smartphone, CheckCircle2, Store } from "lucide-react";
+import { Mail, Smartphone, CheckCircle2, Store, Lock, Eye, EyeOff } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -16,18 +16,19 @@ export default function RegisterPage() {
     lastName: "",
     email: "",
     phone: "",
+    password: "", // 🔴 Naya Password field
     role: "Customer (Buy Groceries)", 
   });
   
   const [otp, setOtp] = useState("");
-  const [generatedOtp, setGeneratedOtp] = useState(""); // Asli OTP save karne ke liye
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showPassword, setShowPassword] = useState(false); // 🔴 Password dikhane/chhupane ka state
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // 🔴 ASLI API WALA REQUEST FUNCTION
+  // 1. Request OTP from Backend
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
@@ -38,53 +39,67 @@ export default function RegisterPage() {
       return;
     }
 
+    if (formData.password.length < 6) {
+      alert("Password kam se kam 6 characters ka hona chahiye");
+      setIsProcessing(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: formData.email, name: formData.firstName })
+        body: JSON.stringify({ email: formData.email, name: `${formData.firstName} ${formData.lastName}` })
       });
 
       const data = await response.json();
 
       if (data.success) {
-        setGeneratedOtp(data.otp); 
         setIsProcessing(false);
         setStep(2); 
       } else {
-        alert("Failed to send OTP. Check email settings.");
+        alert(data.error || "Failed to send OTP.");
         setIsProcessing(false);
       }
     } catch (error) {
-      console.error(error);
       alert("Server Error! Make sure API route is correct.");
       setIsProcessing(false);
     }
   };
 
-  // 🔴 ASLI OTP VERIFY FUNCTION
-  const handleVerifyAndRegister = (e: React.FormEvent) => {
+  // 2. Verify OTP with Backend
+  const handleVerifyAndRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
 
-    if (otp === generatedOtp) { 
-      const userData = {
-        id: "GB-" + Math.random().toString(36).substr(2, 9),
-        name: `${formData.firstName} ${formData.lastName}`,
-        email: formData.email,
-        phone: formData.phone,
-        role: formData.role.includes("Retailer") ? "retailer" 
-              : formData.role.includes("Wholesaler") ? "wholesaler" 
-              : "customer",
-      };
+    try {
+      // 🔴 Ab hum DB se OTP match karwayenge aur baaki data save karwayenge
+      const response = await fetch('/api/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email: formData.email, 
+          otp: otp,
+          phone: formData.phone,
+          password: formData.password,
+          role: formData.role.includes("Retailer") ? "retailer" : formData.role.includes("Wholesaler") ? "wholesaler" : "customer"
+        })
+      });
 
-      login(userData); 
-      
-      if (userData.role === "retailer") router.push("/retailer/dashboard");
-      else if (userData.role === "wholesaler") router.push("/wholesaler/dashboard");
-      else router.push("/");
-    } else {
-      alert("Incorrect OTP! Please check your email.");
+      const data = await response.json();
+
+      if (data.success) {
+        login(data.userData); 
+        
+        if (data.userData.role === "retailer") router.push("/retailer/dashboard");
+        else if (data.userData.role === "wholesaler") router.push("/wholesaler/dashboard");
+        else router.push("/");
+      } else {
+        alert(data.error); // Yahan aayega Incorrect ya Expired OTP ka alert
+        setIsProcessing(false);
+      }
+    } catch (error) {
+      alert("Verification failed due to server error.");
       setIsProcessing(false);
     }
   };
@@ -105,7 +120,6 @@ export default function RegisterPage() {
 
         {step === 1 ? (
           <form onSubmit={handleRequestOtp} className="space-y-4 sm:space-y-5">
-            {/* 🔴 FULL RESPONSIVE FIX: grid-cols-1 on small mobile, grid-cols-2 on SM and above */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="mb-1.5 block text-xs sm:text-sm font-medium text-gray-700">First Name</label>
@@ -123,7 +137,6 @@ export default function RegisterPage() {
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
                   <Mail className="h-5 w-5 text-gray-400" />
                 </div>
-                {/* 🔴 PADDING FIX */}
                 <input required name="email" value={formData.email} onChange={handleChange} type="email" placeholder="name@example.com" className="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-12 pr-4 text-sm outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10" />
               </div>
             </div>
@@ -135,8 +148,33 @@ export default function RegisterPage() {
                   <Smartphone className="h-5 w-5 text-gray-400" />
                   <span className="ml-2 font-medium text-gray-500">+91</span>
                 </div>
-                {/* 🔴 PADDING FIX */}
                 <input required name="phone" maxLength={10} value={formData.phone} onChange={handleChange} type="tel" placeholder="9876543210" className="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-20 pr-4 text-sm outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10" />
+              </div>
+            </div>
+
+            {/* 🔴 PASSWORD FIELD WITH SHOW/HIDE TOGGLE */}
+            <div>
+              <label className="mb-1.5 block text-xs sm:text-sm font-medium text-gray-700">Create Password</label>
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                  <Lock className="h-5 w-5 text-gray-400" />
+                </div>
+                <input 
+                  required 
+                  name="password" 
+                  value={formData.password} 
+                  onChange={handleChange} 
+                  type={showPassword ? "text" : "password"} 
+                  placeholder="••••••••" 
+                  className="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-12 pr-12 text-sm outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10" 
+                />
+                <button 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-500 hover:text-emerald-600 transition"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
               </div>
             </div>
 

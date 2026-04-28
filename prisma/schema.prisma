@@ -1,11 +1,10 @@
-// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "mysql"
-  // 🔴 Yahan se url hata diya hai!
+  url      = env("DATABASE_URL") // 🔴 Wapas add kar diya!
 }
 
 model User {

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore"; 
-import { Mail, CheckCircle2, Store, Lock, KeyRound } from "lucide-react";
+import { Mail, CheckCircle2, Store, Lock, KeyRound, Eye, EyeOff } from "lucide-react"; // 🔴 Eye icons import kiye
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,30 +16,26 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showPassword, setShowPassword] = useState(false); // 🔴 Password toggle state
 
-  // Helper: Redirect users based on their DB role
   const redirectUser = (role: string) => {
     if (role === "retailer") router.push("/retailer/dashboard");
     else if (role === "wholesaler") router.push("/wholesaler/dashboard");
     else router.push("/");
   };
 
-  // 1. Handle Login via Password
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
-
     try {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
-      
       const data = await res.json();
-
       if (data.success) {
-        login(data.userData); // Store user data from DB
+        login(data.userData); 
         redirectUser(data.userData.role);
       } else {
         alert(data.error || "Invalid Credentials");
@@ -51,25 +47,18 @@ export default function LoginPage() {
     }
   };
 
-  // 2. Request OTP from Server
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
-
     try {
       const res = await fetch('/api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }) 
       });
-
       const data = await res.json();
-
-      if (data.success) {
-        setStep(2); // Move to OTP input step
-      } else {
-        alert(data.error);
-      }
+      if (data.success) setStep(2);
+      else alert(data.error);
     } catch (err) {
       alert("Failed to send OTP");
     } finally {
@@ -77,22 +66,18 @@ export default function LoginPage() {
     }
   };
 
-  // 3. Verify OTP and Login
   const handleVerifyAndLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
-
     try {
       const res = await fetch('/api/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp })
       });
-
       const data = await res.json();
-
       if (data.success) {
-        login(data.userData); // User verified by DB
+        login(data.userData);
         redirectUser(data.userData.role);
       } else {
         alert(data.error);
@@ -108,7 +93,6 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-md rounded-[24px] bg-white p-6 shadow-sm border border-gray-100">
         
-        {/* Header Section */}
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
             <Store className="h-8 w-8" />
@@ -117,7 +101,6 @@ export default function LoginPage() {
           <p className="mt-2 text-sm text-gray-500">Sign in to Global Baniya</p>
         </div>
 
-        {/* --- PASSWORD LOGIN --- */}
         {loginMode === 'password' && (
           <form onSubmit={handlePasswordLogin} className="space-y-5">
             <div>
@@ -131,11 +114,26 @@ export default function LoginPage() {
             <div>
               <div className="flex justify-between items-center mb-1.5">
                 <label className="block text-sm font-medium text-gray-700">Password</label>
-                <Link href="/forgot-password" size="sm" className="text-xs text-emerald-600 font-medium">Forgot?</Link>
+                <Link href="/forgot-password" className="text-xs text-emerald-600 font-medium hover:underline">Forgot?</Link>
               </div>
               <div className="relative">
                 <Lock className="absolute left-4 top-3.5 h-5 w-5 text-gray-400" />
-                <input required value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="••••••••" className="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-12 text-sm focus:border-emerald-500 focus:bg-white outline-none transition-all" />
+                {/* 🔴 Password Show/Hide Input */}
+                <input 
+                  required 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  type={showPassword ? "text" : "password"} 
+                  placeholder="••••••••" 
+                  className="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-12 pr-12 text-sm focus:border-emerald-500 focus:bg-white outline-none transition-all" 
+                />
+                <button 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-3.5 text-gray-400 hover:text-emerald-600 transition"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
               </div>
             </div>
 
@@ -155,7 +153,7 @@ export default function LoginPage() {
           </form>
         )}
 
-        {/* --- OTP LOGIN: STEP 1 (Email) --- */}
+        {/* ... (Baaqi ka OTP wala code same rahega) ... */}
         {loginMode === 'otp' && step === 1 && (
           <form onSubmit={handleRequestOtp} className="space-y-5">
             <div>
@@ -174,7 +172,6 @@ export default function LoginPage() {
           </form>
         )}
 
-        {/* --- OTP LOGIN: STEP 2 (Verify) --- */}
         {loginMode === 'otp' && step === 2 && (
           <form onSubmit={handleVerifyAndLogin} className="space-y-6">
             <div className="rounded-xl bg-emerald-50 p-4 border border-emerald-100 flex gap-3">
@@ -192,7 +189,6 @@ export default function LoginPage() {
           </form>
         )}
 
-        {/* Footer Link */}
         {(step === 1 || loginMode === 'password') && (
           <p className="mt-8 text-center text-sm text-gray-600">
             New to Global Baniya? <Link href="/register" className="font-semibold text-emerald-600 hover:underline">Register</Link>
