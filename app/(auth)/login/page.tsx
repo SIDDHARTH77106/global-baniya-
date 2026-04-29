@@ -19,8 +19,10 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false); // 🔴 Password toggle state
 
   const redirectUser = (role: string) => {
-    if (role === "retailer") router.push("/retailer/dashboard");
-    else if (role === "wholesaler") router.push("/wholesaler/dashboard");
+    const normalizedRole = role.toUpperCase();
+    if (normalizedRole === "RETAILER") router.push("/retailer/dashboard");
+    else if (normalizedRole === "WHOLESALER") router.push("/wholesaler/dashboard");
+    else if (normalizedRole === "ADMIN") router.push("/admin/inventory");
     else router.push("/");
   };
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { SESSION_COOKIE_NAME, createRoleSession, normalizeRole } from '@/lib/auth-session';
 
 export async function POST(request: Request) {
   try {
@@ -21,15 +22,30 @@ export async function POST(request: Request) {
         otp: null, 
         otpExpiry: null,
         phone: phone || user.phone,
-        role: role || user.role,
+        role: normalizeRole(role || user.role),
         password: password || user.password
       }
     });
 
-    return NextResponse.json({ 
+    const response = NextResponse.json({ 
       success: true, 
-      userData: { id: updatedUser.id, name: updatedUser.name, email: updatedUser.email, role: updatedUser.role } 
+      userData: {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: normalizeRole(updatedUser.role),
+      } 
     });
+
+    response.cookies.set(SESSION_COOKIE_NAME, createRoleSession(updatedUser), {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7,
+    });
+
+    return response;
 
   } catch (error) {
     console.error("Verify API Error:", error);

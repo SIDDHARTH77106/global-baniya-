@@ -39,10 +39,12 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       router.replace('/login');
     } else if (isAuthenticated && isPublicPath) {
       // Memory check hui, Login hai, aur galti se Login page par wapas aaya hai
-      if (user?.role === 'retailer') {
+      if (user?.role === 'RETAILER') {
         router.replace('/retailer/dashboard');
-      } else if (user?.role === 'wholesaler') {
+      } else if (user?.role === 'WHOLESALER') {
         router.replace('/wholesaler/dashboard');
+      } else if (user?.role === 'ADMIN') {
+        router.replace('/admin/inventory');
       } else {
         router.replace('/');
       }

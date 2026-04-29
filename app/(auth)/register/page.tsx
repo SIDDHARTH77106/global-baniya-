@@ -82,7 +82,7 @@ export default function RegisterPage() {
           otp: otp,
           phone: formData.phone,
           password: formData.password,
-          role: formData.role.includes("Retailer") ? "retailer" : formData.role.includes("Wholesaler") ? "wholesaler" : "customer"
+          role: formData.role.includes("Retailer") ? "RETAILER" : formData.role.includes("Wholesaler") ? "WHOLESALER" : "CUSTOMER"
         })
       });
 
@@ -91,8 +91,9 @@ export default function RegisterPage() {
       if (data.success) {
         login(data.userData); 
         
-        if (data.userData.role === "retailer") router.push("/retailer/dashboard");
-        else if (data.userData.role === "wholesaler") router.push("/wholesaler/dashboard");
+        if (data.userData.role === "RETAILER") router.push("/retailer/dashboard");
+        else if (data.userData.role === "WHOLESALER") router.push("/wholesaler/dashboard");
+        else if (data.userData.role === "ADMIN") router.push("/admin/inventory");
         else router.push("/");
       } else {
         alert(data.error); // Yahan aayega Incorrect ya Expired OTP ka alert

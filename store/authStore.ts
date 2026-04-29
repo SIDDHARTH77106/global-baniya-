@@ -5,8 +5,8 @@ interface User {
   id: string;
   name: string;
   email: string;
-  phone: string;
-  role: 'customer' | 'retailer' | 'wholesaler';
+  phone?: string;
+  role: 'CUSTOMER' | 'RETAILER' | 'WHOLESALER' | 'ADMIN';
 }
 
 interface AuthState {
@@ -21,8 +21,17 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       isAuthenticated: false,
-      login: (userData) => set({ user: userData, isAuthenticated: true }),
-      logout: () => set({ user: null, isAuthenticated: false }),
+      login: (userData) =>
+        set({
+          user: { ...userData, role: userData.role.toUpperCase() as User['role'] },
+          isAuthenticated: true,
+        }),
+      logout: () => {
+        if (typeof document !== 'undefined') {
+          document.cookie = 'global-baniya-session=; Max-Age=0; path=/; SameSite=Lax';
+        }
+        set({ user: null, isAuthenticated: false });
+      },
     }),
     {
       name: 'global-baniya-auth',

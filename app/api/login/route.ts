@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { SESSION_COOKIE_NAME, createRoleSession, normalizeRole } from '@/lib/auth-session';
 
 export async function POST(request: Request) { 
   try {
@@ -17,15 +18,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Galat Email ya Password." }, { status: 401 });
     }
 
-    return NextResponse.json({ 
+    const response = NextResponse.json({ 
       success: true, 
       userData: { 
         id: user.id, 
         name: user.name, 
         email: user.email, 
-        role: user.role 
+        role: normalizeRole(user.role)
       } 
     });
+
+    response.cookies.set(SESSION_COOKIE_NAME, createRoleSession(user), {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7,
+    });
+
+    return response;
 
   } catch (error) {
     console.error("Login API Error:", error);

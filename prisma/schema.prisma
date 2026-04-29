@@ -4,7 +4,14 @@ generator client {
 
 datasource db {
   provider = "mysql"
-  url      = env("DATABASE_URL") // 🔴 Wapas add kar diya!
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  RETAILER
+  WHOLESALER
+  ADMIN
 }
 
 model User {
@@ -15,7 +22,58 @@ model User {
   password  String?
   otp       String?
   otpExpiry DateTime?
-  role      String    @default("customer")
+  role      Role      @default(CUSTOMER)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+}
+
+model Product {
+  id          String    @id @default(uuid())
+  shortTitle  String
+  longTitle   String?
+  slug        String    @unique
+  brand       String?
+  description String?   @db.Text
+  category    String?
+  image       String?
+  isActive    Boolean   @default(true)
+  variants    Variant[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([category])
+  @@index([isActive])
+}
+
+model Variant {
+  id          String       @id @default(uuid())
+  productId   String
+  product     Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name        String
+  value       String
+  sortOrder   Int          @default(0)
+  subVariants SubVariant[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([productId])
+}
+
+model SubVariant {
+  id            String   @id @default(uuid())
+  variantId     String
+  variant       Variant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  value         String
+  unit          String
+  sku           String   @unique
+  mrp           Decimal  @db.Decimal(10, 2)
+  sellingPrice  Decimal? @db.Decimal(10, 2)
+  currency      String   @default("INR")
+  stockQuantity Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([variantId])
+  @@index([stockQuantity])
 }

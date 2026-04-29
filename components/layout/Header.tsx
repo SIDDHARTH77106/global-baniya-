@@ -1,6 +1,6 @@
 'use client';
 
-import { Search, ShoppingCart, User, MapPin, Menu, ChevronDown, Wallet, LogOut, X, Heart } from 'lucide-react';
+import { Search, ShoppingCart, User, ChevronDown, X, Menu } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -10,13 +10,39 @@ export default function Header() {
   const { isAuthenticated, user, logout } = useAuthStore();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  
+  // 🚀 Search States
+  const [query, setQuery] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null); // Search bar ka ref
   const router = useRouter();
+
+  // 🚀 Fake database for search dropdown (Later replace with API)
+  const searchSuggestions = [
+    { id: 1, name: "Amul Taaza Milk", icon: "🥛", cat: "Dairy" },
+    { id: 2, name: "Aashirvaad Atta", icon: "🌾", cat: "Grocery" },
+    { id: 3, name: "Farm Fresh Onion", icon: "🧅", cat: "Vegetables" },
+    { id: 4, name: "Maggi Noodles", icon: "🍜", cat: "Snacks" },
+    { id: 5, name: "Britannia Biscuits", icon: "🍪", cat: "Snacks" },
+    { id: 6, name: "Mother Dairy Milk", icon: "🥛", cat: "Dairy" },
+  ];
+
+  const filteredSuggestions = searchSuggestions.filter(p => 
+    p.name.toLowerCase().includes(query.toLowerCase()) ||
+    p.cat.toLowerCase().includes(query.toLowerCase())
+  );
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
+      // Close User Menu if clicked outside
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsUserMenuOpen(false);
+      }
+      // Close Search Suggestions if clicked outside
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -30,8 +56,18 @@ export default function Header() {
     router.push('/login'); 
   };
 
+  // 🚀 Navigate to Search Page when form is submitted
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (query.trim()) {
+      setShowSuggestions(false);
+      router.push(`/search?q=${encodeURIComponent(query)}`);
+    }
+  };
+
   return (
     <>
+      {/* Logout Modal */}
       {isLogoutModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
           <div className="w-full max-w-sm rounded-3xl bg-white p-7 shadow-2xl animate-in zoom-in-95">
@@ -56,115 +92,185 @@ export default function Header() {
         </div>
       )}
 
-      <header className="w-full bg-white shadow-md sticky top-0 z-50">
-        <div className="bg-blue-600 w-full py-3 px-4 md:px-8 flex items-center justify-between gap-3 md:gap-4">
+      {/* LE HEADER */}
+      <header className="w-full bg-white sticky top-0 z-50 border-b border-gray-100 shadow-sm">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-4">
           
-          <div className="flex items-center gap-3">
-            <button className="md:hidden text-white hover:text-yellow-400 transition">
-              <Menu className="w-7 h-7" />
-            </button>
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-9 h-9 md:w-10 md:h-10 bg-yellow-400 rounded-xl flex items-center justify-center text-blue-900 font-black text-lg md:text-xl shadow-inner">
+          {/* ==================================================== */}
+          {/* DESKTOP VIEW */}
+          {/* ==================================================== */}
+          <div className="hidden md:flex items-center justify-between gap-6 lg:gap-8">
+            
+            {/* 1. Logo */}
+            <Link href="/" className="flex items-center gap-2 shrink-0">
+              <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-md">
                 GB
               </div>
-              <span className="text-xl md:text-2xl font-black text-white tracking-tighter hidden sm:block">
+              <span className="text-2xl font-black text-gray-900 tracking-tight hidden lg:block">
                 Global Baniya
               </span>
             </Link>
-          </div>
 
-          <div className="hidden lg:flex items-center gap-2 text-white bg-blue-700/50 hover:bg-blue-800 px-3 py-2 rounded-xl cursor-pointer transition border border-blue-500/30">
-            <MapPin className="w-5 h-5 text-yellow-400" />
-            <div className="flex flex-col text-left">
-              <span className="text-[9px] uppercase font-black opacity-80 tracking-wide">Deliver to</span>
-              <span className="font-bold text-xs flex items-center">Pune, MH <ChevronDown className="w-3 h-3 ml-1" /></span>
+            {/* 2. Location */}
+            <div className="flex flex-col cursor-pointer group shrink-0">
+              <span className="text-[11px] font-extrabold text-emerald-600 uppercase tracking-wide">Delivery in 10 min</span>
+              <span className="text-sm font-bold text-gray-800 flex items-center group-hover:text-emerald-700 transition-colors">
+                Pune, Maharashtra <ChevronDown className="w-4 h-4 ml-1 text-gray-500" />
+              </span>
+            </div>
+
+            {/* 3. 🚀 LIVE SEARCH BAR (Desktop) */}
+            <div className="flex-1 max-w-3xl relative" ref={searchRef}>
+              <form onSubmit={handleSearchSubmit} className="relative flex items-center w-full bg-gray-100 rounded-2xl px-4 py-3 focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-500 focus-within:shadow-md transition-all">
+                <Search className="w-5 h-5 text-gray-500 shrink-0" />
+                <input 
+                  type="text" 
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => setShowSuggestions(true)}
+                  placeholder="Search for 'Atta', 'Dal', 'Milk'..." 
+                  className="w-full bg-transparent px-3 outline-none text-sm font-semibold text-gray-800 placeholder:text-gray-400 placeholder:font-medium" 
+                />
+              </form>
+
+              {/* 🚀 DROPDOWN SUGGESTIONS */}
+              {showSuggestions && query.length > 0 && (
+                <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-2xl shadow-2xl border border-gray-100 z-[150] overflow-hidden">
+                  {filteredSuggestions.length > 0 ? (
+                    <ul>
+                      {filteredSuggestions.map(item => (
+                        <li key={item.id} className="hover:bg-gray-50 border-b border-gray-50 last:border-none transition-colors">
+                          <Link 
+                            href={`/search?q=${item.name}`} 
+                            onClick={() => {
+                              setShowSuggestions(false);
+                              setQuery(item.name);
+                            }} 
+                            className="flex items-center gap-4 p-4"
+                          >
+                            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-xl">{item.icon}</div>
+                            <div>
+                              <h4 className="font-bold text-gray-900">{item.name}</h4>
+                              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">{item.cat}</p>
+                            </div>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="p-6 text-center text-gray-500 font-medium">No results found for "{query}"</div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 4. Actions (Login, Cart) */}
+            <div className="flex items-center gap-4 shrink-0">
+              
+              {!isAuthenticated ? (
+                <Link href="/login" className="text-sm font-bold text-gray-700 hover:text-emerald-600 transition px-2">
+                  Login
+                </Link>
+              ) : (
+                <div className="relative" ref={dropdownRef}>
+                  <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex items-center gap-2 text-gray-700 hover:text-emerald-600 transition p-2">
+                    <User className="w-5 h-5" />
+                    <span className="text-sm font-bold">{user?.name.split(' ')[0]}</span>
+                  </button>
+                  {isUserMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2">
+                      <div className="px-5 py-3 border-b border-gray-100">
+                        <p className="text-sm font-black text-gray-900">{user?.name}</p>
+                        <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mt-0.5">{user?.role}</p>
+                      </div>
+                      <Link href="/orders" onClick={() => setIsUserMenuOpen(false)} className="block px-5 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50">My Orders</Link>
+                      <button onClick={() => setIsLogoutModalOpen(true)} className="w-full text-left px-5 py-3 text-sm font-bold text-red-600 hover:bg-red-50">Sign Out</button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <Link href="/cart" className="flex items-center gap-3 bg-emerald-600 text-white px-4 py-2.5 rounded-xl font-bold hover:bg-emerald-700 transition active:scale-95 shadow-md shadow-emerald-200">
+                <ShoppingCart className="w-5 h-5" />
+                <div className="flex flex-col text-left">
+                  <span className="text-[10px] uppercase font-black tracking-wider leading-none">2 Items</span>
+                  <span className="text-sm leading-tight mt-0.5">₹345</span>
+                </div>
+              </Link>
+              
             </div>
           </div>
 
-          <form className="hidden md:flex flex-1 max-w-2xl bg-white rounded-xl overflow-hidden shadow-inner focus-within:ring-2 focus-within:ring-yellow-400 transition-all ml-4">
-            <input type="text" placeholder="Search for groceries, brands, or local shops..." className="w-full px-5 py-3 outline-none text-sm font-medium text-gray-700" />
-            <button type="submit" className="bg-yellow-400 text-blue-900 px-6 font-black hover:bg-yellow-500 transition-colors flex items-center gap-2 text-sm">
-              <Search className="w-4 h-4" /> Search
-            </button>
-          </form>
-
-          <div className="flex items-center gap-5 md:gap-6 text-white ml-auto md:ml-0">
-            
-            <Link href="/wishlist" className="hidden lg:block text-white hover:text-yellow-400 transition">
-              <Heart className="w-6 h-6" />
-            </Link>
-
-            <Link href="/cart" className="flex items-center gap-2 group relative">
-              <div className="relative">
-                <ShoppingCart className="w-7 h-7 md:w-6 md:h-6 group-hover:text-yellow-400 transition" />
-                <span className="absolute -top-2 -right-2 bg-yellow-400 text-blue-900 text-[10px] font-black rounded-full w-5 h-5 md:w-4 md:h-4 flex items-center justify-center border-2 border-blue-600 shadow-sm">
-                  2
+          {/* ==================================================== */}
+          {/* MOBILE VIEW */}
+          {/* ==================================================== */}
+          <div className="md:hidden flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col cursor-pointer">
+                <span className="text-[10px] font-extrabold text-emerald-600 uppercase tracking-wide">Delivery in 10 min</span>
+                <span className="text-sm font-bold text-gray-900 flex items-center">
+                  Pune, MH <ChevronDown className="w-4 h-4 ml-1 text-gray-500" />
                 </span>
               </div>
-              <div className="hidden md:flex flex-col">
-                <span className="text-[9px] font-black opacity-80 uppercase">Cart</span>
-                <span className="font-bold text-xs">₹345</span>
-              </div>
-            </Link>
+              
+              <Link href="/cart" className="flex items-center gap-2 bg-emerald-600 text-white px-3 py-2 rounded-lg font-bold shadow-md">
+                <ShoppingCart className="w-4 h-4" />
+                <span className="text-xs">₹345</span>
+              </Link>
+            </div>
 
-            {!isAuthenticated ? (
-              <div className="flex items-center gap-3">
-                <Link href="/login" className="text-sm font-bold hover:text-yellow-400 hidden sm:block transition">
-                  Login
-                </Link>
-                <Link href="/register" className="bg-yellow-400 text-blue-900 px-4 py-2 md:px-5 md:py-2.5 rounded-xl text-xs md:text-sm font-black hover:bg-yellow-500 transition shadow-lg shadow-blue-800/20 active:scale-95">
-                  Sign Up
-                </Link>
-              </div>
-            ) : (
-              <div className="relative" ref={dropdownRef}>
-                <button 
-                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center gap-2 outline-none hover:opacity-80 transition"
-                >
-                  <div className="bg-blue-800 p-2 rounded-full border border-blue-400 shadow-sm">
-                    <User className="w-5 h-5 md:w-4 md:h-4 text-white" />
-                  </div>
-                  <div className="hidden md:flex flex-col items-start">
-                    <span className="text-[9px] font-black opacity-80 uppercase tracking-widest text-yellow-400">{user?.role}</span>
-                    <span className="font-bold text-xs flex items-center">{user?.name.split(' ')[0]} <ChevronDown className="w-3 h-3 ml-1" /></span>
-                  </div>
-                </button>
+            {/* 🚀 LIVE SEARCH BAR (Mobile) */}
+            <div className="relative w-full">
+              <form onSubmit={handleSearchSubmit} className="relative flex items-center w-full bg-gray-100 rounded-xl px-3 py-2.5 focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-500 transition-all">
+                <Search className="w-5 h-5 text-gray-500 shrink-0" />
+                <input 
+                  type="text" 
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => setShowSuggestions(true)}
+                  placeholder="Search 'Atta', 'Dal'..." 
+                  className="w-full bg-transparent px-2 outline-none text-sm font-semibold text-gray-800" 
+                />
+              </form>
 
-                {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-4 w-64 bg-white rounded-2xl shadow-2xl border border-gray-100 text-gray-800 overflow-hidden py-2 z-50 animate-in fade-in slide-in-from-top-2">
-                    <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
-                      <p className="text-base font-black text-gray-900">{user?.name}</p>
-                      <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mt-1">{user?.role} Account</p>
-                    </div>
-                    <Link href="/profile" onClick={() => setIsUserMenuOpen(false)} className="flex items-center gap-3 px-5 py-3 hover:bg-blue-50 transition text-sm font-bold text-gray-700">
-                      <Wallet className="w-5 h-5 text-blue-600" /> Wallet Balance: <span className="text-green-600 ml-auto">₹100</span>
-                    </Link>
-                    <Link href="/orders" onClick={() => setIsUserMenuOpen(false)} className="flex items-center gap-3 px-5 py-3 hover:bg-blue-50 transition text-sm font-bold text-gray-700">
-                      <ShoppingCart className="w-5 h-5 text-gray-400" /> My Orders
-                    </Link>
-                    <div className="border-t border-gray-100 mt-2 pt-2">
-                      <button 
-                        onClick={() => setIsLogoutModalOpen(true)}
-                        className="flex items-center gap-3 px-5 py-3 hover:bg-red-50 text-red-600 w-full text-left text-sm font-bold transition"
-                      >
-                        <LogOut className="w-5 h-5" /> Sign Out
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+              {/* Mobile Suggestions Dropdown */}
+              {showSuggestions && query.length > 0 && (
+                <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-2xl shadow-2xl border border-gray-100 z-[150] overflow-hidden">
+                  {filteredSuggestions.length > 0 ? (
+                    <ul>
+                      {filteredSuggestions.map(item => (
+                        <li key={item.id} className="hover:bg-gray-50 border-b border-gray-50 transition-colors">
+                          <Link 
+                            href={`/search?q=${item.name}`} 
+                            onClick={() => {
+                              setShowSuggestions(false);
+                              setQuery(item.name);
+                            }} 
+                            className="flex items-center gap-3 p-3"
+                          >
+                            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-lg">{item.icon}</div>
+                            <div>
+                              <h4 className="font-bold text-gray-900 text-sm">{item.name}</h4>
+                              <p className="text-[9px] font-black text-emerald-600 uppercase">{item.cat}</p>
+                            </div>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="p-4 text-center text-gray-500 text-sm font-medium">No results found</div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        <div className="md:hidden bg-blue-600 px-4 pb-4">
-          <form className="flex w-full bg-white rounded-xl overflow-hidden shadow-inner focus-within:ring-2 focus-within:ring-yellow-400 transition-all">
-            <input type="text" placeholder="Search products or stores..." className="w-full px-4 py-3 outline-none text-sm font-medium text-gray-700" />
-            <button type="submit" className="bg-yellow-400 text-blue-900 px-5 flex items-center justify-center hover:bg-yellow-500 transition-colors">
-              <Search className="w-5 h-5 font-black" />
-            </button>
-          </form>
         </div>
       </header>
     </>
