@@ -15,39 +15,42 @@ enum Role {
 }
 
 model User {
-  id       String   @id @default(uuid())
-  name     String
-  email    String   @unique
-  phone    String?
-  password String?
-  otp      String?
-  role     Role     @default(CUSTOMER)
-  reviews  Reviews[]
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  password  String?
+  otp       String?
+  role      Role     @default(CUSTOMER)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  reviews   Reviews[]
 
   @@map("users")
 }
 
 model ProductType {
-  product_type_id  String            @id @default(uuid())
-  type_name        String            @unique
-  productCategory  ProductCategory[]
-  products         Product[]
+  product_type_id String            @id @default(uuid())
+  type_name       String            @unique
+  productCategory ProductCategory[]
+  products        Product[]
 
   @@map("product_type")
 }
 
 model ProductCategory {
-  product_category_id String            @id @default(uuid())
-  product_type_id     String
-  category_name       String
-  parent_cat_id       String?
-  category_image      String?
-  category_description String?          @db.Text
-  size_category_id    String?
-  productType         ProductType       @relation(fields: [product_type_id], references: [product_type_id], onDelete: Restrict)
-  parentCategory      ProductCategory?  @relation("ProductCategoryHierarchy", fields: [parent_cat_id], references: [product_category_id], onDelete: SetNull)
-  childCategories     ProductCategory[] @relation("ProductCategoryHierarchy")
-  sizeCategory        SizeCategory?     @relation(fields: [size_category_id], references: [size_category_id], onDelete: SetNull)
+  product_category_id  String            @id @default(uuid())
+  product_type_id      String
+  category_name        String
+  parent_cat_id        String?
+  category_image       String?
+  category_description String?           @db.Text
+  size_category_id     String?
+  
+  productType          ProductType       @relation(fields: [product_type_id], references: [product_type_id], onDelete: Restrict)
+  parentCategory       ProductCategory?  @relation("ProductCategoryHierarchy", fields: [parent_cat_id], references: [product_category_id], onDelete: SetNull)
+  childCategories      ProductCategory[] @relation("ProductCategoryHierarchy")
+  sizeCategory         SizeCategory?     @relation(fields: [size_category_id], references: [size_category_id], onDelete: SetNull)
 
   @@index([product_type_id])
   @@index([parent_cat_id])
@@ -70,11 +73,14 @@ model Product {
   product_name     String
   original_price   Decimal            @db.Decimal(10, 2)
   sale_price       Decimal?           @db.Decimal(10, 2)
-  updatedAt        DateTime           @updatedAt @map("updated_at")
   product_desc     String?            @db.Text
   brand_id         String?
   care_instruction String?            @db.Text
   about            String?            @db.Text
+  
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
   productType      ProductType        @relation(fields: [product_type], references: [product_type_id], onDelete: Restrict)
   brand            Brand?             @relation(fields: [brand_id], references: [brand_id], onDelete: SetNull)
   productImages    ProductImage[]
@@ -102,9 +108,11 @@ model Reviews {
   product_id String
   user_id    String
   reviews    String   @db.Text
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
   date       DateTime
+  
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  
   product    Product  @relation(fields: [product_id], references: [product_id], onDelete: Cascade)
   user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
@@ -128,6 +136,10 @@ model ProductItem {
   original_price  Decimal          @db.Decimal(10, 2)
   sale_price      Decimal?         @db.Decimal(10, 2)
   product_code    String           @unique
+  
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  
   product         Product          @relation(fields: [product_id], references: [product_id], onDelete: Cascade)
   color           Color?           @relation(fields: [color_id], references: [color_id], onDelete: SetNull)
   productVariants ProductVariant[]
@@ -162,7 +174,10 @@ model ProductVariant {
   product_item_id String
   size_id         String
   qty_in_stock    Int         @default(0)
+  
+  createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
+  
   productItem     ProductItem @relation(fields: [product_item_id], references: [product_item_id], onDelete: Cascade)
   sizeOption      SizeOption  @relation(fields: [size_id], references: [size_id], onDelete: Restrict)
 
