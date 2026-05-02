@@ -3,10 +3,20 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
-import { CheckCircle2, Eye, EyeOff, Lock, Mail, ShieldCheck, Store, UserRound } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck, Store, UserRound, X } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 
 type Role = 'CUSTOMER' | 'RETAILER' | 'WHOLESALER';
+type Message = { text: string; type: 'error' | 'success' };
+
+const inputClassName =
+  'w-full rounded-lg border border-gray-200 bg-gray-50 py-3 pl-12 pr-4 text-sm font-semibold outline-none transition focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30';
+
+const passwordInputClassName =
+  'w-full rounded-lg border border-gray-200 bg-gray-50 py-3 pl-12 pr-12 text-sm font-semibold outline-none transition focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30';
+
+const selectClassName =
+  'w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-700 outline-none transition focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -19,12 +29,12 @@ export default function RegisterPage() {
   const [otp, setOtp] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState<Message | null>(null);
 
   async function handleRegistrationRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
-    setMessage('');
+    setMessage(null);
 
     try {
       const response = await fetch('/api/auth/register', {
@@ -39,9 +49,9 @@ export default function RegisterPage() {
       }
 
       setStep('otp');
-      setMessage('OTP sent. Verify it to activate your account.');
+      setMessage({ text: 'OTP sent. Verify it to activate your account.', type: 'success' });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Registration failed.');
+      setMessage({ text: error instanceof Error ? error.message : 'Registration failed.', type: 'error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -50,7 +60,7 @@ export default function RegisterPage() {
   async function handleOtpVerification(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
-    setMessage('');
+    setMessage(null);
 
     try {
       const response = await fetch('/api/auth/register', {
@@ -67,7 +77,7 @@ export default function RegisterPage() {
       login(data.userData);
       router.push(data.redirectTo);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'OTP verification failed.');
+      setMessage({ text: error instanceof Error ? error.message : 'OTP verification failed.', type: 'error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -119,13 +129,33 @@ export default function RegisterPage() {
             </div>
 
             {message && (
-              <div className="mb-5 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
-                {message}
+              <div
+                className={`mb-5 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm font-bold ${
+                  message.type === 'error'
+                    ? 'border-red-200 bg-red-50 text-red-600'
+                    : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                }`}
+                role={message.type === 'error' ? 'alert' : 'status'}
+              >
+                {message.type === 'error' ? (
+                  <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                ) : (
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+                )}
+                <span className="flex-1">{message.text}</span>
+                <button
+                  type="button"
+                  onClick={() => setMessage(null)}
+                  className="rounded-md p-0.5 opacity-70 transition hover:bg-white/70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  aria-label="Dismiss message"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
             )}
 
             {step === 'details' ? (
-              <form onSubmit={handleRegistrationRequest} className="space-y-5">
+              <form onSubmit={handleRegistrationRequest} autoComplete="off" className="space-y-5">
                 <div>
                   <label className="mb-1.5 block text-sm font-bold text-gray-700">Name</label>
                   <div className="relative">
@@ -134,7 +164,8 @@ export default function RegisterPage() {
                       required
                       value={name}
                       onChange={(event) => setName(event.target.value)}
-                      className="w-full rounded-lg border border-gray-200 bg-gray-50 py-3 pl-12 pr-4 text-sm font-semibold outline-none transition focus:border-emerald-500 focus:bg-white"
+                      autoComplete="name"
+                      className={inputClassName}
                       placeholder="Your full name"
                     />
                   </div>
@@ -148,7 +179,8 @@ export default function RegisterPage() {
                       required
                       value={contact}
                       onChange={(event) => setContact(event.target.value)}
-                      className="w-full rounded-lg border border-gray-200 bg-gray-50 py-3 pl-12 pr-4 text-sm font-semibold outline-none transition focus:border-emerald-500 focus:bg-white"
+                      autoComplete="email"
+                      className={inputClassName}
                       placeholder="name@example.com"
                     />
                   </div>
@@ -163,7 +195,8 @@ export default function RegisterPage() {
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
                       type={showPassword ? 'text' : 'password'}
-                      className="w-full rounded-lg border border-gray-200 bg-gray-50 py-3 pl-12 pr-12 text-sm font-semibold outline-none transition focus:border-emerald-500 focus:bg-white"
+                      autoComplete="new-password"
+                      className={passwordInputClassName}
                       placeholder="At least 8 characters"
                     />
                     <button
@@ -182,7 +215,7 @@ export default function RegisterPage() {
                   <select
                     value={role}
                     onChange={(event) => setRole(event.target.value as Role)}
-                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-black text-gray-700 outline-none transition focus:border-emerald-500 focus:bg-white"
+                    className={selectClassName}
                   >
                     <option value="CUSTOMER">Customer</option>
                     <option value="RETAILER">Retailer</option>
@@ -193,13 +226,14 @@ export default function RegisterPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full rounded-lg bg-emerald-600 py-3.5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 py-3.5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  {isSubmitting ? 'Sending OTP...' : 'Send OTP'}
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isSubmitting ? 'Loading...' : 'Send OTP'}
                 </button>
               </form>
             ) : (
-              <form onSubmit={handleOtpVerification} className="space-y-5">
+              <form onSubmit={handleOtpVerification} autoComplete="off" className="space-y-5">
                 <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4">
                   <div className="flex items-start gap-3">
                     <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-700" />
@@ -216,7 +250,8 @@ export default function RegisterPage() {
                     value={otp}
                     onChange={(event) => setOtp(event.target.value.replace(/\D/g, ''))}
                     maxLength={6}
-                    className="w-full rounded-lg border border-gray-200 bg-gray-50 py-3 text-center text-xl font-black tracking-[0.45em] outline-none transition focus:border-emerald-500 focus:bg-white"
+                    autoComplete="one-time-code"
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-center text-xl font-black tracking-[0.45em] outline-none transition focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                     placeholder="000000"
                   />
                 </div>
@@ -224,9 +259,10 @@ export default function RegisterPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full rounded-lg bg-emerald-600 py-3.5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 py-3.5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  {isSubmitting ? 'Creating account...' : 'Verify and Create Account'}
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isSubmitting ? 'Loading...' : 'Verify and Create Account'}
                 </button>
 
                 <button
@@ -234,7 +270,7 @@ export default function RegisterPage() {
                   onClick={() => {
                     setStep('details');
                     setOtp('');
-                    setMessage('');
+                    setMessage(null);
                   }}
                   className="w-full py-2 text-sm font-bold text-gray-500 hover:text-emerald-700"
                 >

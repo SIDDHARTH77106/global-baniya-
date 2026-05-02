@@ -5,6 +5,7 @@ import "./globals.css";
 // 🔴 Global Components Imports
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import { ToastProvider } from "@/components/providers/ToastProvider";
 import AuthGuard from "@/components/providers/AuthGuard"; // 👈 Bouncer import kar liya
 
 const geistSans = Geist({
@@ -35,6 +36,7 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col bg-gray-50 text-gray-900">
         
         {/* 🛡️ THE STRICT AUTH GUARD (Sab kuch iske andar aayega) */}
+        <ToastProvider>
         <AuthGuard>
           
           {/* Global Navbar */}
@@ -49,6 +51,7 @@ export default function RootLayout({
           <Footer />
           
         </AuthGuard>
+        </ToastProvider>
 
       </body>
     </html>

@@ -3,10 +3,17 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
-import { Eye, EyeOff, KeyRound, Lock, Mail, Phone, ShoppingBag, Store } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Eye, EyeOff, KeyRound, Loader2, Lock, Mail, Phone, ShoppingBag, Store, X } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 
 type LoginMode = 'password' | 'otp';
+type Message = { text: string; type: 'error' | 'success' };
+
+const inputClassName =
+  'w-full rounded-lg border border-gray-200 bg-gray-50 py-3 pl-12 pr-4 text-sm font-semibold outline-none transition focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30';
+
+const passwordInputClassName =
+  'w-full rounded-lg border border-gray-200 bg-gray-50 py-3 pl-12 pr-12 text-sm font-semibold outline-none transition focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,12 +25,12 @@ export default function LoginPage() {
   const [otpSent, setOtpSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState<Message | null>(null);
 
   async function handlePasswordLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
-    setMessage('');
+    setMessage(null);
 
     try {
       const response = await fetch('/api/auth/login', {
@@ -40,7 +47,7 @@ export default function LoginPage() {
       login(data.userData);
       router.push(data.redirectTo);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Login failed.');
+      setMessage({ text: error instanceof Error ? error.message : 'Login failed.', type: 'error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -48,7 +55,7 @@ export default function LoginPage() {
 
   async function handleSendOtp() {
     setIsSubmitting(true);
-    setMessage('');
+    setMessage(null);
 
     try {
       const response = await fetch('/api/auth/send-otp', {
@@ -63,9 +70,9 @@ export default function LoginPage() {
       }
 
       setOtpSent(true);
-      setMessage('OTP sent to the email linked with this account.');
+      setMessage({ text: 'OTP sent to the email linked with this account.', type: 'success' });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Failed to send OTP.');
+      setMessage({ text: error instanceof Error ? error.message : 'Failed to send OTP.', type: 'error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -74,7 +81,7 @@ export default function LoginPage() {
   async function handleOtpLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
-    setMessage('');
+    setMessage(null);
 
     try {
       const response = await fetch('/api/auth/login', {
@@ -91,7 +98,7 @@ export default function LoginPage() {
       login(data.userData);
       router.push(data.redirectTo);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'OTP login failed.');
+      setMessage({ text: error instanceof Error ? error.message : 'OTP login failed.', type: 'error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -142,13 +149,33 @@ export default function LoginPage() {
             </div>
 
             {message && (
-              <div className="mb-5 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
-                {message}
+              <div
+                className={`mb-5 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm font-bold ${
+                  message.type === 'error'
+                    ? 'border-red-200 bg-red-50 text-red-600'
+                    : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                }`}
+                role={message.type === 'error' ? 'alert' : 'status'}
+              >
+                {message.type === 'error' ? (
+                  <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                ) : (
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+                )}
+                <span className="flex-1">{message.text}</span>
+                <button
+                  type="button"
+                  onClick={() => setMessage(null)}
+                  className="rounded-md p-0.5 opacity-70 transition hover:bg-white/70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  aria-label="Dismiss message"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
             )}
 
             {mode === 'password' ? (
-              <form onSubmit={handlePasswordLogin} className="space-y-5">
+              <form onSubmit={handlePasswordLogin} autoComplete="off" className="space-y-5">
                 <div>
                   <label className="mb-1.5 block text-sm font-bold text-gray-700">Email or Phone Number</label>
                   <div className="relative">
@@ -157,7 +184,8 @@ export default function LoginPage() {
                       required
                       value={identifier}
                       onChange={(event) => setIdentifier(event.target.value)}
-                      className="w-full rounded-lg border border-gray-200 bg-gray-50 py-3 pl-12 pr-4 text-sm font-semibold outline-none transition focus:border-emerald-500 focus:bg-white"
+                      autoComplete="username"
+                      className={inputClassName}
                       placeholder="name@example.com or 9876543210"
                     />
                   </div>
@@ -177,7 +205,8 @@ export default function LoginPage() {
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
                       type={showPassword ? 'text' : 'password'}
-                      className="w-full rounded-lg border border-gray-200 bg-gray-50 py-3 pl-12 pr-12 text-sm font-semibold outline-none transition focus:border-emerald-500 focus:bg-white"
+                      autoComplete="current-password"
+                      className={passwordInputClassName}
                       placeholder="Enter your password"
                     />
                     <button
@@ -194,16 +223,17 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full rounded-lg bg-emerald-600 py-3.5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 py-3.5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  {isSubmitting ? 'Signing in...' : 'Sign In'}
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isSubmitting ? 'Loading...' : 'Sign In'}
                 </button>
 
                 <button
                   type="button"
                   onClick={() => {
                     setMode('otp');
-                    setMessage('');
+                    setMessage(null);
                   }}
                   className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 py-3 text-sm font-black text-gray-700 transition hover:bg-emerald-50 hover:text-emerald-700"
                 >
@@ -212,7 +242,7 @@ export default function LoginPage() {
                 </button>
               </form>
             ) : (
-              <form onSubmit={handleOtpLogin} className="space-y-5">
+              <form onSubmit={handleOtpLogin} autoComplete="off" className="space-y-5">
                 <div>
                   <label className="mb-1.5 block text-sm font-bold text-gray-700">Email or Phone Number</label>
                   <div className="relative">
@@ -221,7 +251,8 @@ export default function LoginPage() {
                       required
                       value={identifier}
                       onChange={(event) => setIdentifier(event.target.value)}
-                      className="w-full rounded-lg border border-gray-200 bg-gray-50 py-3 pl-12 pr-4 text-sm font-semibold outline-none transition focus:border-emerald-500 focus:bg-white"
+                      autoComplete="username"
+                      className={inputClassName}
                       placeholder="name@example.com or 9876543210"
                     />
                   </div>
@@ -231,9 +262,10 @@ export default function LoginPage() {
                   type="button"
                   onClick={handleSendOtp}
                   disabled={isSubmitting || !identifier}
-                  className="w-full rounded-lg border border-emerald-200 bg-emerald-50 py-3 text-sm font-black text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 py-3 text-sm font-black text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  {otpSent ? 'Send OTP Again' : 'Send Login OTP'}
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isSubmitting ? 'Loading...' : otpSent ? 'Send OTP Again' : 'Send Login OTP'}
                 </button>
 
                 {otpSent && (
@@ -244,7 +276,8 @@ export default function LoginPage() {
                       value={otp}
                       onChange={(event) => setOtp(event.target.value.replace(/\D/g, ''))}
                       maxLength={6}
-                      className="w-full rounded-lg border border-gray-200 bg-gray-50 py-3 text-center text-xl font-black tracking-[0.45em] outline-none transition focus:border-emerald-500 focus:bg-white"
+                      autoComplete="one-time-code"
+                      className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-center text-xl font-black tracking-[0.45em] outline-none transition focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                       placeholder="000000"
                     />
                   </div>
@@ -253,9 +286,10 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting || !otpSent}
-                  className="w-full rounded-lg bg-emerald-600 py-3.5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 py-3.5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  {isSubmitting ? 'Verifying...' : 'Verify and Login'}
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isSubmitting ? 'Loading...' : 'Verify and Login'}
                 </button>
 
                 <button
@@ -264,7 +298,7 @@ export default function LoginPage() {
                     setMode('password');
                     setOtpSent(false);
                     setOtp('');
-                    setMessage('');
+                    setMessage(null);
                   }}
                   className="w-full py-2 text-sm font-bold text-gray-500 hover:text-emerald-700"
                 >

@@ -1,13 +1,17 @@
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import {
+  AlertTriangle,
+  BarChart3,
+  Boxes,
   ClipboardList,
   LayoutDashboard,
   PackageOpen,
   Settings,
   ShieldCheck,
-  Store,
-  Truck,
+  Tags,
+  UsersRound,
+  WalletCards,
 } from 'lucide-react';
 import { AppRole, SESSION_COOKIE_NAME, readRoleSession } from '@/lib/auth-session';
 
@@ -15,46 +19,41 @@ type SidebarLink = {
   name: string;
   href: string;
   icon: typeof LayoutDashboard;
-  roles: AppRole[];
 };
 
-const links: SidebarLink[] = [
-  {
-    name: 'Dashboard',
-    href: '/retailer/dashboard',
-    icon: LayoutDashboard,
-    roles: ['RETAILER'],
-  },
-  {
-    name: 'Dashboard',
-    href: '/wholesaler/dashboard',
-    icon: Truck,
-    roles: ['WHOLESALER'],
-  },
-  {
-    name: 'Master Inventory',
-    href: '/admin/inventory',
-    icon: PackageOpen,
-    roles: ['ADMIN', 'RETAILER'],
-  },
-  {
-    name: 'Orders',
-    href: '/profile/orders',
-    icon: ClipboardList,
-    roles: ['ADMIN', 'RETAILER', 'WHOLESALER'],
-  },
-  {
-    name: 'Settings',
-    href: '/settings',
-    icon: Settings,
-    roles: ['ADMIN', 'RETAILER', 'WHOLESALER'],
-  },
+const adminLinks: SidebarLink[] = [
+  { name: 'Overview', href: '/admin', icon: BarChart3 },
+  { name: 'Master Inventory', href: '/admin/inventory', icon: PackageOpen },
+  { name: 'Category Management', href: '/admin/categories', icon: Tags },
+  { name: 'Users', href: '/admin/users', icon: UsersRound },
+  { name: 'Settings', href: '/admin/settings', icon: Settings },
 ];
 
+const vendorLinksByRole: Record<'RETAILER' | 'WHOLESALER', SidebarLink[]> = {
+  RETAILER: [
+    { name: 'Dashboard', href: '/retailer/dashboard', icon: LayoutDashboard },
+    { name: 'My Orders', href: '/retailer/orders', icon: ClipboardList },
+    { name: 'Low Stock Alerts', href: '/retailer/alerts', icon: AlertTriangle },
+    { name: 'Payouts', href: '/retailer/payouts', icon: WalletCards },
+  ],
+  WHOLESALER: [
+    { name: 'Dashboard', href: '/wholesaler/dashboard', icon: LayoutDashboard },
+    { name: 'My Orders', href: '/wholesaler/orders', icon: ClipboardList },
+    { name: 'Low Stock Alerts', href: '/wholesaler/alerts', icon: AlertTriangle },
+    { name: 'Payouts', href: '/wholesaler/payouts', icon: WalletCards },
+  ],
+};
+
+function getLinks(role: AppRole) {
+  if (role === 'ADMIN') return adminLinks;
+  if (role === 'RETAILER' || role === 'WHOLESALER') return vendorLinksByRole[role];
+  return [];
+}
+
 function roleLabel(role: AppRole) {
-  if (role === 'ADMIN') return 'Platform Admin';
-  if (role === 'WHOLESALER') return 'Bulk Supplier';
-  if (role === 'RETAILER') return 'Local Retailer';
+  if (role === 'ADMIN') return 'Super Admin';
+  if (role === 'WHOLESALER') return 'Wholesale Partner';
+  if (role === 'RETAILER') return 'Retail Partner';
   return 'Customer';
 }
 
@@ -62,49 +61,67 @@ export default async function VendorSidebar() {
   const cookieStore = await cookies();
   const session = readRoleSession(cookieStore.get(SESSION_COOKIE_NAME)?.value);
   const role = session?.role ?? 'CUSTOMER';
-  const visibleLinks = links.filter((link) => link.roles.includes(role));
+  const visibleLinks = getLinks(role);
 
   return (
-    <aside className="hidden min-h-screen w-64 shrink-0 border-r border-gray-200 bg-white lg:flex lg:flex-col lg:sticky lg:top-0">
-      <div className="border-b border-gray-100 p-6">
+    <aside className="hidden min-h-screen w-72 shrink-0 border-r border-slate-200 bg-slate-950 text-white lg:sticky lg:top-0 lg:flex lg:flex-col">
+      <div className="border-b border-white/10 p-6">
         <Link href="/" className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-600 text-sm font-black text-white">
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-500 text-sm font-black text-white">
             GB
           </div>
           <div>
-            <p className="text-lg font-black tracking-tight text-gray-950">Vendor Portal</p>
-            <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Global Baniya</p>
+            <p className="text-lg font-black tracking-tight">Global Baniya</p>
+            <p className="text-[11px] font-black uppercase tracking-wide text-emerald-300">Command Center</p>
           </div>
         </Link>
       </div>
 
-      <nav className="flex-1 space-y-2 p-4">
+      <div className="p-4">
+        <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+          <div className="mb-3 flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-300">
+              {role === 'ADMIN' ? <ShieldCheck className="h-5 w-5" /> : <Boxes className="h-5 w-5" />}
+            </div>
+            <div>
+              <p className="text-sm font-black">{roleLabel(role)}</p>
+              <p className="text-[10px] font-black uppercase tracking-wide text-slate-400">Session role</p>
+            </div>
+          </div>
+          <div className="h-1.5 rounded-full bg-white/10">
+            <div className="h-1.5 w-3/4 rounded-full bg-emerald-400" />
+          </div>
+        </div>
+      </div>
+
+      <nav className="flex-1 space-y-1 px-4 pb-4">
         {visibleLinks.map((item) => {
           const Icon = item.icon;
 
           return (
             <Link
-              key={`${item.href}-${item.name}`}
+              key={item.href}
               href={item.href}
-              className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold text-gray-600 transition hover:bg-emerald-50 hover:text-emerald-700"
+              className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold text-slate-300 transition hover:bg-white/10 hover:text-white"
             >
-              <Icon className="h-5 w-5 text-gray-400" />
+              <Icon className="h-5 w-5 text-emerald-300" />
               {item.name}
             </Link>
           );
         })}
+
+        {visibleLinks.length === 0 && (
+          <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-sm font-bold text-slate-300">
+            No dashboard links are available for this role.
+          </div>
+        )}
       </nav>
 
-      <div className="p-4">
-        <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
-          <div className="mb-2 flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-              {role === 'ADMIN' ? <ShieldCheck className="h-4 w-4" /> : <Store className="h-4 w-4" />}
-            </div>
-            <span className="text-xs font-black uppercase text-gray-900">{roleLabel(role)}</span>
-          </div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">
-            Session role: {role}
+      <div className="border-t border-white/10 p-4">
+        <div className="rounded-lg bg-emerald-500/10 p-4">
+          <p className="text-xs font-black uppercase tracking-wide text-emerald-300">Inventory Sync</p>
+          <p className="mt-2 text-sm font-semibold leading-6 text-slate-300">
+            Variant stock updates revalidate admin, vendor, and storefront surfaces.
           </p>
         </div>
       </div>

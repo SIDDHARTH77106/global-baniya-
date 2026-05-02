@@ -70,6 +70,7 @@ model Product {
   product_name     String
   original_price   Decimal            @db.Decimal(10, 2)
   sale_price       Decimal?           @db.Decimal(10, 2)
+  updatedAt        DateTime           @updatedAt @map("updated_at")
   product_desc     String?            @db.Text
   brand_id         String?
   care_instruction String?            @db.Text
@@ -161,6 +162,7 @@ model ProductVariant {
   product_item_id String
   size_id         String
   qty_in_stock    Int         @default(0)
+  updatedAt       DateTime    @updatedAt @map("updated_at")
   productItem     ProductItem @relation(fields: [product_item_id], references: [product_item_id], onDelete: Cascade)
   sizeOption      SizeOption  @relation(fields: [size_id], references: [size_id], onDelete: Restrict)
 

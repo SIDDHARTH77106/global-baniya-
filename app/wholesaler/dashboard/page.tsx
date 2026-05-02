@@ -1,5 +1,8 @@
 import Link from 'next/link';
-import { Boxes, ClipboardList, PackageOpen, Truck } from 'lucide-react';
+import { AlertTriangle, Boxes, ClipboardList, PackageOpen, Truck } from 'lucide-react';
+import { getLowStockAlerts } from '@/app/actions/inventory.actions';
+import LowStockRestockList from '@/components/dashboard/LowStockRestockList';
+import RecentActivity from '@/components/dashboard/RecentActivity';
 import VendorSidebar from '@/components/layout/VendorSidebar';
 import { prisma } from '@/lib/prisma';
 
@@ -35,8 +38,18 @@ async function getBulkInventory() {
 }
 
 export default async function WholesalerDashboard() {
-  const bulkInventory = await getBulkInventory();
+  const [bulkInventory, lowStockItems] = await Promise.all([getBulkInventory(), getLowStockAlerts()]);
   const totalBulkUnits = bulkInventory.reduce((sum, item) => sum + item.qty_in_stock, 0);
+  const alertItems = lowStockItems.map((variant) => ({
+    variant_id: variant.variant_id,
+    qty_in_stock: variant.qty_in_stock,
+    size_name: variant.sizeOption.size_name,
+    product_name: variant.productItem.product.product_name,
+    product_code: variant.productItem.product_code,
+    brand_name: variant.productItem.product.brand?.brand_name ?? null,
+    type_name: variant.productItem.product.productType.type_name,
+    color_name: variant.productItem.color?.color_name ?? null,
+  }));
 
   return (
     <div className="min-h-screen bg-gray-50 lg:flex">
@@ -55,7 +68,7 @@ export default async function WholesalerDashboard() {
           </div>
 
           <Link
-            href="/profile/orders"
+            href="/wholesaler/orders"
             className="flex w-fit items-center gap-2 rounded-lg bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
           >
             <ClipboardList className="h-5 w-5" />
@@ -136,6 +149,29 @@ export default async function WholesalerDashboard() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        <section id="low-stock" className="mt-8 overflow-hidden rounded-lg border border-amber-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-amber-100 bg-amber-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-700" />
+                <h2 className="text-lg font-black text-amber-950">Wholesale Low Stock Alerts</h2>
+              </div>
+              <p className="mt-1 text-sm font-semibold text-amber-800">
+                Restock ProductVariant rows below 10 units without leaving the dashboard.
+              </p>
+            </div>
+            <span className="w-fit rounded-full border border-amber-200 bg-white px-3 py-1 text-xs font-black text-amber-700">
+              {lowStockItems.length} variants
+            </span>
+          </div>
+
+          <LowStockRestockList items={alertItems} />
+        </section>
+
+        <div className="mt-8">
+          <RecentActivity />
         </div>
       </main>
     </div>

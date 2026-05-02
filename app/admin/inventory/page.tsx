@@ -1,6 +1,6 @@
-import { revalidatePath } from 'next/cache';
-import { AlertCircle, PackageOpen, Save } from 'lucide-react';
-import VendorSidebar from '@/components/layout/VendorSidebar';
+import { AlertTriangle, PackageOpen, ShieldCheck } from 'lucide-react';
+import InventoryTable, { InventoryProduct } from '@/components/admin/InventoryTable';
+import DashboardLayout from '@/components/layout/DashboardLayout';
 import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -12,176 +12,197 @@ function toNumber(value: unknown) {
   return 0;
 }
 
-async function updateInventory(formData: FormData) {
-  'use server';
+type InventoryFilters = {
+  query: string;
+  productTypeId: string;
+  stockStatus: 'all' | 'low' | 'out';
+};
 
-  const variantId = String(formData.get('variantId') || '');
-  const qtyInStock = Number(formData.get('qty_in_stock'));
-
-  if (!variantId || !Number.isInteger(qtyInStock) || qtyInStock < 0) {
-    throw new Error('qty_in_stock must be a non-negative whole number.');
-  }
-
-  await prisma.productVariant.update({
-    where: { variant_id: variantId },
-    data: { qty_in_stock: qtyInStock },
-  });
-
-  revalidatePath('/admin/inventory');
+function readParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value[0] ?? '';
+  return value ?? '';
 }
 
-async function getInventory() {
-  return prisma.productVariant.findMany({
-    orderBy: [{ qty_in_stock: 'asc' }, { variant_id: 'asc' }],
+async function getInventoryProducts(filters: InventoryFilters): Promise<InventoryProduct[]> {
+  const search = filters.query.trim();
+  const where = {
+    AND: [
+      search
+        ? {
+            OR: [
+              { product_name: { contains: search } },
+              {
+                productItems: {
+                  some: {
+                    product_code: { contains: search },
+                  },
+                },
+              },
+            ],
+          }
+        : {},
+      filters.productTypeId ? { product_type: filters.productTypeId } : {},
+      filters.stockStatus === 'low'
+        ? {
+            productItems: {
+              some: {
+                productVariants: {
+                  some: {
+                    qty_in_stock: { gt: 0, lt: 10 },
+                  },
+                },
+              },
+            },
+          }
+        : {},
+      filters.stockStatus === 'out'
+        ? {
+            productItems: {
+              some: {
+                productVariants: {
+                  some: {
+                    qty_in_stock: 0,
+                  },
+                },
+              },
+            },
+          }
+        : {},
+    ],
+  };
+
+  const products = await prisma.product.findMany({
+    where,
+    orderBy: { product_name: 'asc' },
     include: {
-      sizeOption: true,
-      productItem: {
+      brand: true,
+      productType: true,
+      productItems: {
+        orderBy: { product_code: 'asc' },
         include: {
           color: true,
-          product: {
+          productVariants: {
+            orderBy: [{ qty_in_stock: 'asc' }, { variant_id: 'asc' }],
             include: {
-              brand: true,
-              productType: true,
+              sizeOption: true,
             },
           },
         },
       },
     },
   });
+
+  return products.map((product) => ({
+    product_id: product.product_id,
+    product_name: product.product_name,
+    product_desc: product.product_desc,
+    original_price: toNumber(product.original_price),
+    sale_price: product.sale_price === null ? null : toNumber(product.sale_price),
+    brand: product.brand ? { brand_name: product.brand.brand_name } : null,
+    productType: { type_name: product.productType.type_name },
+    productItems: product.productItems.map((item) => ({
+      product_item_id: item.product_item_id,
+      product_code: item.product_code,
+      original_price: toNumber(item.original_price),
+      sale_price: item.sale_price === null ? null : toNumber(item.sale_price),
+      color: item.color ? { color_name: item.color.color_name } : null,
+      productVariants: item.productVariants.map((variant) => ({
+        variant_id: variant.variant_id,
+        qty_in_stock: variant.qty_in_stock,
+        sizeOption: { size_name: variant.sizeOption.size_name },
+      })),
+    })),
+  }));
 }
 
-export default async function InventoryDashboard() {
-  const inventory = await getInventory();
-  const totalUnits = inventory.reduce((sum, item) => sum + item.qty_in_stock, 0);
-  const lowStockCount = inventory.filter((item) => item.qty_in_stock > 0 && item.qty_in_stock <= 10).length;
-  const outOfStockCount = inventory.filter((item) => item.qty_in_stock === 0).length;
+async function getCreationOptions() {
+  const [productTypes, brands, colors, sizes] = await Promise.all([
+    prisma.productType.findMany({ orderBy: { type_name: 'asc' } }),
+    prisma.brand.findMany({ orderBy: { brand_name: 'asc' } }),
+    prisma.color.findMany({ orderBy: { color_name: 'asc' } }),
+    prisma.sizeOption.findMany({ orderBy: { size_name: 'asc' } }),
+  ]);
+
+  return {
+    productTypes: productTypes.map((type) => ({ id: type.product_type_id, label: type.type_name })),
+    brands: brands.map((brand) => ({ id: brand.brand_id, label: brand.brand_name })),
+    colors: colors.map((color) => ({ id: color.color_id, label: color.color_name })),
+    sizes: sizes.map((size) => ({ id: size.size_id, label: size.size_name })),
+  };
+}
+
+export default async function InventoryDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const params = await searchParams;
+  const stockParam = readParam(params.stock);
+  const filters: InventoryFilters = {
+    query: readParam(params.q),
+    productTypeId: readParam(params.type),
+    stockStatus: stockParam === 'low' || stockParam === 'out' ? stockParam : 'all',
+  };
+
+  const [products, options] = await Promise.all([getInventoryProducts(filters), getCreationOptions()]);
+  const totalVariants = products.reduce(
+    (sum, product) => sum + product.productItems.reduce((itemSum, item) => itemSum + item.productVariants.length, 0),
+    0
+  );
+  const lowStockVariants = products.reduce(
+    (sum, product) =>
+      sum +
+      product.productItems.reduce(
+        (itemSum, item) =>
+          itemSum + item.productVariants.filter((variant) => variant.qty_in_stock < 10).length,
+        0
+      ),
+    0
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50 lg:flex">
-      <VendorSidebar />
-
-      <main className="flex-1 p-4 md:p-8">
-        <div className="mx-auto max-w-7xl">
-          <div className="mb-8 flex flex-col gap-4 border-b border-gray-200 pb-6 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h1 className="flex items-center gap-3 text-3xl font-black text-gray-950">
-                <PackageOpen className="h-8 w-8 text-emerald-600" />
-                Master Inventory Control
-              </h1>
-              <p className="mt-1 text-sm font-medium text-gray-500">
-                Stock is tracked strictly at ProductVariant.qty_in_stock.
-              </p>
+    <DashboardLayout
+      title="Master Inventory Control"
+      subtitle="Manage Product, ProductItem, and ProductVariant stock in one synchronized command surface."
+      breadcrumbs={[
+        { label: 'Admin', href: '/admin' },
+        { label: 'Master Inventory' },
+      ]}
+    >
+      <div className="mx-auto max-w-7xl space-y-6">
+        <section className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+              <PackageOpen className="h-6 w-6" />
             </div>
-            <div className="grid grid-cols-3 gap-3 text-center">
-              <div className="rounded-lg border border-gray-100 bg-white px-4 py-3">
-                <p className="text-lg font-black text-gray-950">{totalUnits}</p>
-                <p className="text-[10px] font-bold uppercase text-gray-400">Units</p>
-              </div>
-              <div className="rounded-lg border border-yellow-100 bg-yellow-50 px-4 py-3">
-                <p className="text-lg font-black text-yellow-700">{lowStockCount}</p>
-                <p className="text-[10px] font-bold uppercase text-yellow-700">Low</p>
-              </div>
-              <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3">
-                <p className="text-lg font-black text-red-700">{outOfStockCount}</p>
-                <p className="text-[10px] font-bold uppercase text-red-700">Out</p>
-              </div>
-            </div>
+            <p className="text-sm font-black text-slate-500">Products</p>
+            <p className="mt-1 text-3xl font-black text-slate-950">{products.length}</p>
           </div>
-
-          <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="border-b border-gray-100 bg-gray-50">
-                  <tr>
-                    <th className="p-4 text-xs font-black uppercase text-gray-500">Product</th>
-                    <th className="p-4 text-xs font-black uppercase text-gray-500">ProductItem</th>
-                    <th className="p-4 text-xs font-black uppercase text-gray-500">Color</th>
-                    <th className="p-4 text-xs font-black uppercase text-gray-500">Size</th>
-                    <th className="p-4 text-xs font-black uppercase text-gray-500">Price</th>
-                    <th className="p-4 text-xs font-black uppercase text-gray-500">qty_in_stock</th>
-                    <th className="p-4 text-right text-xs font-black uppercase text-gray-500">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {inventory.map((variant) => {
-                    const item = variant.productItem;
-                    const product = item.product;
-                    const originalPrice = toNumber(item.original_price);
-                    const salePrice = item.sale_price ? toNumber(item.sale_price) : originalPrice;
-
-                    return (
-                      <tr key={variant.variant_id} className="hover:bg-gray-50">
-                        <td className="p-4">
-                          <p className="font-bold text-gray-950">{product.product_name}</p>
-                          <p className="mt-1 text-xs font-semibold text-gray-500">
-                            {product.brand?.brand_name ?? 'No brand'} / {product.productType.type_name}
-                          </p>
-                        </td>
-                        <td className="p-4 font-mono text-xs font-bold text-gray-700">
-                          {item.product_code}
-                        </td>
-                        <td className="p-4 text-sm font-bold text-gray-700">
-                          {item.color?.color_name ?? 'Default'}
-                        </td>
-                        <td className="p-4 text-sm font-bold text-gray-700">{variant.sizeOption.size_name}</td>
-                        <td className="p-4">
-                          <p className="text-sm font-black text-gray-950">INR {salePrice}</p>
-                          {originalPrice > salePrice && (
-                            <p className="text-xs font-semibold text-gray-400 line-through">INR {originalPrice}</p>
-                          )}
-                        </td>
-                        <td className="p-4">
-                          <form id={`inventory-${variant.variant_id}`} action={updateInventory} className="flex flex-col gap-2">
-                            <input type="hidden" name="variantId" value={variant.variant_id} />
-                            <input
-                              type="number"
-                              min={0}
-                              name="qty_in_stock"
-                              defaultValue={variant.qty_in_stock}
-                              className="w-28 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-black text-gray-950 outline-none focus:border-emerald-500"
-                            />
-                            {variant.qty_in_stock > 10 ? (
-                              <span className="w-fit rounded-full bg-green-100 px-3 py-1 text-[10px] font-black uppercase text-green-700">
-                                {variant.qty_in_stock} in stock
-                              </span>
-                            ) : variant.qty_in_stock > 0 ? (
-                              <span className="flex w-fit items-center gap-1 rounded-full bg-yellow-100 px-3 py-1 text-[10px] font-black uppercase text-yellow-700">
-                                <AlertCircle className="h-3 w-3" /> Low stock
-                              </span>
-                            ) : (
-                              <span className="w-fit rounded-full bg-red-100 px-3 py-1 text-[10px] font-black uppercase text-red-700">
-                                Out of stock
-                              </span>
-                            )}
-                          </form>
-                        </td>
-                        <td className="p-4 text-right">
-                          <button
-                            type="submit"
-                            form={`inventory-${variant.variant_id}`}
-                            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-black text-white transition hover:bg-emerald-700"
-                          >
-                            <Save className="h-4 w-4" />
-                            Save
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-
-                  {inventory.length === 0 && (
-                    <tr>
-                      <td className="p-8 text-center text-sm font-bold text-gray-500" colSpan={7}>
-                        No ProductVariant rows exist yet. Add product items and size variants to track stock.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+              <ShieldCheck className="h-6 w-6" />
             </div>
+            <p className="text-sm font-black text-slate-500">Tracked Variants</p>
+            <p className="mt-1 text-3xl font-black text-slate-950">{totalVariants}</p>
           </div>
-        </div>
-      </main>
-    </div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
+            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-white text-amber-700">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+            <p className="text-sm font-black text-amber-700">Low Stock Variants</p>
+            <p className="mt-1 text-3xl font-black text-amber-900">{lowStockVariants}</p>
+          </div>
+        </section>
+
+        <InventoryTable
+          products={products}
+          productTypes={options.productTypes}
+          brands={options.brands}
+          colors={options.colors}
+          sizes={options.sizes}
+          filters={filters}
+        />
+      </div>
+    </DashboardLayout>
   );
 }
