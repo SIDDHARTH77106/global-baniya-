@@ -75,6 +75,10 @@ async function getProductStockTotals() {
     _sum: { qty_in_stock: true },
   });
 
+  if (totals.length === 0) {
+    return [];
+  }
+
   const productItems = await prisma.productItem.findMany({
     where: {
       product_item_id: {

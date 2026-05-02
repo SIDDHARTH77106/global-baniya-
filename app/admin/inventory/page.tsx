@@ -1,5 +1,6 @@
 import { AlertTriangle, PackageOpen, ShieldCheck } from 'lucide-react';
 import InventoryTable, { InventoryProduct } from '@/components/admin/InventoryTable';
+import TabbedProductView from '@/components/dashboard/TabbedProductView';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { prisma } from '@/lib/prisma';
 
@@ -202,6 +203,65 @@ export default async function InventoryDashboard({
           sizes={options.sizes}
           filters={filters}
         />
+
+        <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
+          <TabbedProductView
+            product={
+              products[0]
+                ? {
+                    name: products[0].product_name,
+                    sku: products[0].productItems[0]?.product_code,
+                    price: products[0].sale_price ?? products[0].original_price,
+                    stock: products[0].productItems.reduce(
+                      (sum, item) => sum + item.productVariants.reduce((variantSum, variant) => variantSum + variant.qty_in_stock, 0),
+                      0
+                    ),
+                    brand: products[0].brand?.brand_name,
+                    category: products[0].productType.type_name,
+                  }
+                : undefined
+            }
+          />
+
+          <div className="space-y-6">
+            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-wide text-emerald-700">Price List Control</p>
+              <h2 className="mt-1 text-lg font-black text-slate-950">Channel Pricing</h2>
+              <div className="mt-4 space-y-3">
+                {[
+                  { label: 'Customer Price', value: 'INR 249' },
+                  { label: 'Retailer Price', value: 'INR 229' },
+                  { label: 'Wholesaler Price', value: 'INR 205' },
+                ].map((row) => (
+                  <label key={row.label} className="block">
+                    <span className="text-xs font-black uppercase tracking-wide text-slate-400">{row.label}</span>
+                    <input
+                      defaultValue={row.value}
+                      className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-black text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-wide text-emerald-700">Multi-Warehouse Visibility</p>
+              <h2 className="mt-1 text-lg font-black text-slate-950">Stock Split</h2>
+              <div className="mt-4 space-y-3">
+                {[
+                  { location: 'Pune Central DC', stock: 120 },
+                  { location: 'Kothrud Micro Hub', stock: 42 },
+                  { location: 'Wholesale Reserve', stock: 310 },
+                ].map((row) => (
+                  <div key={row.location} className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3">
+                    <span className="text-sm font-bold text-slate-700">{row.location}</span>
+                    <span className="text-sm font-black text-slate-950">{row.stock}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        </section>
       </div>
     </DashboardLayout>
   );

@@ -28,9 +28,9 @@ export default function HeroBanner() {
           </p>
           
           <div className="pt-6 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-              <button className="bg-yellow-400 text-emerald-900 px-10 py-5 rounded-xl font-black text-xl hover:bg-yellow-300 transition transform hover:scale-105 shadow-2xl flex items-center justify-center gap-2">
+              <Link href="/search" className="bg-yellow-400 text-emerald-900 px-10 py-5 rounded-xl font-black text-xl hover:bg-yellow-300 transition transform hover:scale-105 shadow-2xl flex items-center justify-center gap-2">
                 <MapPin className="w-6 h-6" /> Explore Stores Near Me
-              </button>
+              </Link>
               <Link href="/subscribe" className="bg-emerald-800 text-white px-8 py-5 rounded-xl font-bold text-lg hover:bg-emerald-900 transition flex items-center justify-center gap-2">
                  See Daily Milk Subscriptions
               </Link>

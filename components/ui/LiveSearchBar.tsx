@@ -2,11 +2,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { Search } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function LiveSearchBar() {
   const [query, setQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   // Fake database for search
   const allProducts = [
@@ -35,10 +37,18 @@ export default function LiveSearchBar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const searchTerm = query.trim();
+    if (!searchTerm) return;
+    setShowSuggestions(false);
+    router.push(`/search?q=${encodeURIComponent(searchTerm)}`);
+  }
+
   return (
     <div ref={searchRef} className="relative w-full max-w-xl hidden md:block">
       {/* 🚀 Search Input */}
-      <div className="relative">
+      <form onSubmit={handleSubmit} className="relative">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
         <input 
           type="text" 
@@ -49,9 +59,15 @@ export default function LiveSearchBar() {
             setShowSuggestions(true);
           }}
           onFocus={() => setShowSuggestions(true)}
-          className="w-full bg-gray-100 border-2 border-transparent focus:bg-white focus:border-emerald-500 rounded-xl py-3 pl-12 pr-4 text-gray-800 font-bold outline-none transition-all shadow-sm"
+          className="w-full bg-gray-100 border-2 border-transparent focus:bg-white focus:border-emerald-500 rounded-xl py-3 pl-12 pr-24 text-gray-800 font-bold outline-none transition-all shadow-sm"
         />
-      </div>
+        <button
+          type="submit"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-black text-white transition hover:bg-emerald-700"
+        >
+          Search
+        </button>
+      </form>
 
       {/* 🚀 Live Suggestions Dropdown */}
       {showSuggestions && query.length > 0 && (
@@ -60,7 +76,7 @@ export default function LiveSearchBar() {
             <ul>
               {suggestions.map(item => (
                 <li key={item.id} className="hover:bg-gray-50 border-b border-gray-50 last:border-0 transition-colors">
-                  <Link href={`/search?q=${item.name}`} onClick={() => setShowSuggestions(false)} className="flex items-center gap-4 p-4">
+                  <Link href={`/search?q=${encodeURIComponent(item.name)}`} onClick={() => setShowSuggestions(false)} className="flex items-center gap-4 p-4">
                     <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-xl">{item.icon}</div>
                     <div>
                       <h4 className="font-bold text-gray-900">{item.name}</h4>

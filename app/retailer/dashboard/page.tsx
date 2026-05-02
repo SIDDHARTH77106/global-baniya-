@@ -1,5 +1,7 @@
 import { AlertTriangle, Bike, IndianRupee, PackageCheck, ShoppingBag } from 'lucide-react';
 import { getLowStockAlerts } from '@/app/actions/inventory.actions';
+import BarcodeScanBox from '@/components/dashboard/BarcodeScanBox';
+import DropshipButton from '@/components/dashboard/DropshipButton';
 import LowStockRestockList from '@/components/dashboard/LowStockRestockList';
 import RecentActivity from '@/components/dashboard/RecentActivity';
 import DashboardLayout from '@/components/layout/DashboardLayout';
@@ -63,6 +65,8 @@ export default async function RetailerDashboard() {
           </div>
         </section>
 
+        <BarcodeScanBox />
+
         <section id="low-stock" className="overflow-hidden rounded-lg border border-amber-200 bg-white shadow-sm">
           <div className="flex flex-col gap-3 border-b border-amber-100 bg-amber-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -80,6 +84,31 @@ export default async function RetailerDashboard() {
           </div>
 
           <LowStockRestockList items={alertItems} />
+        </section>
+
+        <section className="overflow-hidden rounded-lg border border-red-200 bg-white shadow-sm">
+          <div className="border-b border-red-100 bg-red-50 px-5 py-4">
+            <h2 className="text-lg font-black text-red-950">Smart Alerts: Reorder Points</h2>
+            <p className="mt-1 text-sm font-semibold text-red-700">Items with qty below 10 enter the critical zone. Out-of-stock items can be dropshipped.</p>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {alertItems.slice(0, 5).map((item) => (
+              <div key={item.variant_id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-black text-slate-950">{item.product_name}</p>
+                  <p className="text-xs font-bold text-slate-500">{item.product_code} / {item.size_name} / qty {item.qty_in_stock}</p>
+                </div>
+                {item.qty_in_stock === 0 ? (
+                  <DropshipButton productName={item.product_name} />
+                ) : (
+                  <span className="w-fit rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">
+                    Reorder now
+                  </span>
+                )}
+              </div>
+            ))}
+            {alertItems.length === 0 && <div className="p-6 text-center text-sm font-bold text-slate-500">No critical alerts right now.</div>}
+          </div>
         </section>
 
         <RecentActivity />

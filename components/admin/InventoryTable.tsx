@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, Fragment, useMemo, useOptimistic, useState, useTransition } from 'react';
+import { FormEvent, Fragment, useMemo, useOptimistic, useRef, useState, useTransition } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   ChevronDown,
@@ -122,6 +122,7 @@ export default function InventoryTable({
   const [modalStep, setModalStep] = useState(1);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const createProductFormRef = useRef<HTMLFormElement>(null);
 
   const inventorySummary = useMemo(() => {
     return optimisticProducts.reduce(
@@ -237,24 +238,35 @@ export default function InventoryTable({
     const form = event.currentTarget;
     const formData = new FormData(event.currentTarget);
 
+    const rawBrandId = formData.get('brandId');
+    const rawColorId = formData.get('colorId');
+    const rawSizeId = String(formData.get('sizeId') || '');
+    const validationErrors = validateCreateProductForm(formData, 3);
+
+    if (validationErrors.length > 0) {
+      toast.error(`Please fix before creating: ${validationErrors.join(', ')}.`);
+      return;
+    }
+
     setPendingKey('create-product');
     startTransition(() => {
       void createProductBundle({
         productName: String(formData.get('productName') || ''),
         productTypeId: String(formData.get('productTypeId') || ''),
-        brandId: String(formData.get('brandId') || ''),
+        brandId: rawBrandId ? String(rawBrandId) : undefined,
+        imageUrl: String(formData.get('imageUrl') || ''),
         originalPrice: Number(formData.get('originalPrice')),
         productSalePrice: formData.get('productSalePrice') ? Number(formData.get('productSalePrice')) : undefined,
         description: String(formData.get('description') || ''),
         productCode: String(formData.get('productCode') || ''),
-        colorId: String(formData.get('colorId') || ''),
+        colorId: rawColorId ? String(rawColorId) : undefined,
         itemOriginalPrice: Number(formData.get('itemOriginalPrice')),
         itemSalePrice: formData.get('itemSalePrice') ? Number(formData.get('itemSalePrice')) : undefined,
-        sizeId: String(formData.get('sizeId') || ''),
+        sizeId: rawSizeId && rawSizeId !== 'DEFAULT' ? rawSizeId : undefined,
         qtyInStock: Number(formData.get('qtyInStock')),
       })
         .then(() => {
-          toast.success('Product, item, and variant created successfully.');
+          toast.success('Product created successfully.');
           setIsModalOpen(false);
           setModalStep(1);
           form.reset();
@@ -265,6 +277,52 @@ export default function InventoryTable({
         })
         .finally(() => setPendingKey(null));
     });
+  }
+
+  function validateCreateProductForm(formData: FormData, throughStep: number) {
+    const missing: string[] = [];
+    const productName = String(formData.get('productName') || '').trim();
+    const productTypeId = String(formData.get('productTypeId') || '').trim();
+    const originalPriceValue = String(formData.get('originalPrice') || '').trim();
+    const originalPrice = Number(originalPriceValue);
+    const productCode = String(formData.get('productCode') || '').trim();
+    const itemOriginalPriceValue = String(formData.get('itemOriginalPrice') || '').trim();
+    const itemOriginalPrice = Number(itemOriginalPriceValue);
+    const qtyInStockValue = String(formData.get('qtyInStock') || '').trim();
+    const qtyInStock = Number(qtyInStockValue);
+
+    if (throughStep >= 1) {
+      if (!productName) missing.push('product name');
+      if (!productTypeId) missing.push('product type');
+    }
+
+    if (throughStep >= 2) {
+      if (!originalPriceValue || !Number.isFinite(originalPrice) || originalPrice < 0) missing.push('product original price');
+      if (!productCode) missing.push('product code');
+    }
+
+    if (throughStep >= 3) {
+      if (!itemOriginalPriceValue || !Number.isFinite(itemOriginalPrice) || itemOriginalPrice < 0) missing.push('item original price');
+      if (!qtyInStockValue || !Number.isInteger(qtyInStock) || qtyInStock < 0) missing.push('qty_in_stock');
+    }
+
+    return missing;
+  }
+
+  function continueCreateProduct() {
+    const form = createProductFormRef.current;
+    if (!form) return;
+
+    const nextStep = modalStep + 1;
+    const formData = new FormData(form);
+    const missing = validateCreateProductForm(formData, modalStep);
+
+    if (missing.length > 0) {
+      toast.error(`Please fill required fields in Step ${modalStep}: ${missing.join(', ')}.`);
+      return;
+    }
+
+    setModalStep(Math.min(3, nextStep));
   }
 
   return (
@@ -585,17 +643,25 @@ export default function InventoryTable({
               </button>
             </div>
 
-            <form onSubmit={handleCreateProduct} className="p-6">
+            <form ref={createProductFormRef} onSubmit={handleCreateProduct} className="p-6" noValidate>
               <div className={modalStep === 1 ? 'grid gap-4' : 'hidden'}>
                 <label className="text-sm font-black text-slate-700">
-                  Product name
-                  <input name="productName" required className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 font-semibold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+                  Product name <span className="text-red-600">*</span>
+                  <input name="productName" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 font-semibold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+                </label>
+                <label className="text-sm font-black text-slate-700">
+                  Product Image URL
+                  <input
+                    name="imageUrl"
+                    placeholder="https://example.com/product-image.jpg"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 font-semibold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                  />
                 </label>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="text-sm font-black text-slate-700">
-                    Product type
-                    <select name="productTypeId" required className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 font-semibold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
-                      <option value="">Select type</option>
+                    Product type <span className="text-red-600">*</span>
+                    <select name="productTypeId" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 font-semibold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
+                      <option value="">{productTypes.length === 0 ? 'No product types available' : 'Select type'}</option>
                       {productTypes.map((option) => (
                         <option key={option.id} value={option.id}>
                           {option.label}
@@ -606,7 +672,7 @@ export default function InventoryTable({
                   <label className="text-sm font-black text-slate-700">
                     Brand
                     <select name="brandId" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 font-semibold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
-                      <option value="">No brand</option>
+                      <option value="">{brands.length === 0 ? 'No brands yet - continue without brand' : 'No brand'}</option>
                       {brands.map((option) => (
                         <option key={option.id} value={option.id}>
                           {option.label}
@@ -625,8 +691,8 @@ export default function InventoryTable({
               <div className={modalStep === 2 ? 'grid gap-4' : 'hidden'}>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="text-sm font-black text-slate-700">
-                    Product original price
-                    <input name="originalPrice" type="number" min={0} step="0.01" required className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 font-semibold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+                    Product original price <span className="text-red-600">*</span>
+                    <input name="originalPrice" type="number" min={0} step="0.01" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 font-semibold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
                   </label>
                   <label className="text-sm font-black text-slate-700">
                     Product sale price
@@ -635,13 +701,13 @@ export default function InventoryTable({
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="text-sm font-black text-slate-700">
-                    Product code
-                    <input name="productCode" required className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 font-semibold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+                    Product code <span className="text-red-600">*</span>
+                    <input name="productCode" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 font-semibold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
                   </label>
                   <label className="text-sm font-black text-slate-700">
                     Color
                     <select name="colorId" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 font-semibold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
-                      <option value="">Default</option>
+                      <option value="">{colors.length === 0 ? 'No colors yet - use default' : 'Default'}</option>
                       {colors.map((option) => (
                         <option key={option.id} value={option.id}>
                           {option.label}
@@ -655,8 +721,8 @@ export default function InventoryTable({
               <div className={modalStep === 3 ? 'grid gap-4' : 'hidden'}>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="text-sm font-black text-slate-700">
-                    Item original price
-                    <input name="itemOriginalPrice" type="number" min={0} step="0.01" required className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 font-semibold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+                    Item original price <span className="text-red-600">*</span>
+                    <input name="itemOriginalPrice" type="number" min={0} step="0.01" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 font-semibold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
                   </label>
                   <label className="text-sm font-black text-slate-700">
                     Item sale price
@@ -666,8 +732,8 @@ export default function InventoryTable({
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="text-sm font-black text-slate-700">
                     Size
-                    <select name="sizeId" required className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 font-semibold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
-                      <option value="">Select size</option>
+                    <select name="sizeId" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 font-semibold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
+                      <option value="DEFAULT">Free Size / Default</option>
                       {sizes.map((option) => (
                         <option key={option.id} value={option.id}>
                           {option.label}
@@ -676,8 +742,8 @@ export default function InventoryTable({
                     </select>
                   </label>
                   <label className="text-sm font-black text-slate-700">
-                    qty_in_stock
-                    <input name="qtyInStock" type="number" min={0} required className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 font-semibold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+                    qty_in_stock <span className="text-red-600">*</span>
+                    <input name="qtyInStock" type="number" min={0} className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 font-semibold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
                   </label>
                 </div>
               </div>
@@ -694,7 +760,7 @@ export default function InventoryTable({
                 {modalStep < 3 ? (
                   <button
                     type="button"
-                    onClick={() => setModalStep((step) => Math.min(3, step + 1))}
+                    onClick={continueCreateProduct}
                     className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-black text-white transition hover:bg-emerald-700"
                   >
                     Continue

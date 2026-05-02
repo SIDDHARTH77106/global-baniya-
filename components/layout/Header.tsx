@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from "@/store/authStore"; 
+import { useCartStore } from '@/store/cartStore';
 
 export default function Header() {
   const { isAuthenticated, user, logout } = useAuthStore();
+  const cartItems = useCartStore((state) => state.items);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   
@@ -18,6 +20,8 @@ export default function Header() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null); // Search bar ka ref
   const router = useRouter();
+  const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
+  const cartTotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
 
   // 🚀 Fake database for search dropdown (Later replace with API)
   const searchSuggestions = [
@@ -122,7 +126,9 @@ export default function Header() {
             {/* 3. 🚀 LIVE SEARCH BAR (Desktop) */}
             <div className="flex-1 max-w-3xl relative" ref={searchRef}>
               <form onSubmit={handleSearchSubmit} className="relative flex items-center w-full bg-gray-100 rounded-2xl px-4 py-3 focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-500 focus-within:shadow-md transition-all">
-                <Search className="w-5 h-5 text-gray-500 shrink-0" />
+                <button type="submit" aria-label="Search products" className="shrink-0 text-gray-500 transition hover:text-emerald-700">
+                  <Search className="w-5 h-5" />
+                </button>
                 <input 
                   type="text" 
                   value={query}
@@ -144,7 +150,7 @@ export default function Header() {
                       {filteredSuggestions.map(item => (
                         <li key={item.id} className="hover:bg-gray-50 border-b border-gray-50 last:border-none transition-colors">
                           <Link 
-                            href={`/search?q=${item.name}`} 
+                            href={`/search?q=${encodeURIComponent(item.name)}`} 
                             onClick={() => {
                               setShowSuggestions(false);
                               setQuery(item.name);
@@ -196,8 +202,10 @@ export default function Header() {
               <Link href="/cart" className="flex items-center gap-3 bg-emerald-600 text-white px-4 py-2.5 rounded-xl font-bold hover:bg-emerald-700 transition active:scale-95 shadow-md shadow-emerald-200">
                 <ShoppingCart className="w-5 h-5" />
                 <div className="flex flex-col text-left">
-                  <span className="text-[10px] uppercase font-black tracking-wider leading-none">2 Items</span>
-                  <span className="text-sm leading-tight mt-0.5">₹345</span>
+                  <span className="text-[10px] uppercase font-black tracking-wider leading-none">
+                    {cartCount} {cartCount === 1 ? 'Item' : 'Items'}
+                  </span>
+                  <span className="text-sm leading-tight mt-0.5">INR {cartTotal.toFixed(0)}</span>
                 </div>
               </Link>
               
@@ -218,14 +226,16 @@ export default function Header() {
               
               <Link href="/cart" className="flex items-center gap-2 bg-emerald-600 text-white px-3 py-2 rounded-lg font-bold shadow-md">
                 <ShoppingCart className="w-4 h-4" />
-                <span className="text-xs">₹345</span>
+                <span className="text-xs">INR {cartTotal.toFixed(0)}</span>
               </Link>
             </div>
 
             {/* 🚀 LIVE SEARCH BAR (Mobile) */}
             <div className="relative w-full">
               <form onSubmit={handleSearchSubmit} className="relative flex items-center w-full bg-gray-100 rounded-xl px-3 py-2.5 focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-500 transition-all">
-                <Search className="w-5 h-5 text-gray-500 shrink-0" />
+                <button type="submit" aria-label="Search products" className="shrink-0 text-gray-500 transition hover:text-emerald-700">
+                  <Search className="w-5 h-5" />
+                </button>
                 <input 
                   type="text" 
                   value={query}
@@ -247,7 +257,7 @@ export default function Header() {
                       {filteredSuggestions.map(item => (
                         <li key={item.id} className="hover:bg-gray-50 border-b border-gray-50 transition-colors">
                           <Link 
-                            href={`/search?q=${item.name}`} 
+                            href={`/search?q=${encodeURIComponent(item.name)}`} 
                             onClick={() => {
                               setShowSuggestions(false);
                               setQuery(item.name);

@@ -1,7 +1,9 @@
 'use client';
 
 import { Plus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useToast } from '@/components/providers/ToastProvider';
+import { useCartStore } from '@/store/cartStore';
 
 interface ProductCardProps {
   id: string | number;
@@ -13,16 +15,9 @@ interface ProductCardProps {
   image: string;
   tag?: string;
   stockQuantity?: number;
+  productHref?: string;
   onCardClick?: () => void;
 }
-
-type InventoryResponse = {
-  success?: boolean;
-  productStock?: Array<{
-    product_id: string;
-    qty_in_stock: number;
-  }>;
-};
 
 export default function ProductCard({
   id,
@@ -34,39 +29,24 @@ export default function ProductCard({
   image,
   tag,
   stockQuantity = 0,
+  productHref,
   onCardClick,
 }: ProductCardProps) {
-  const [liveStock, setLiveStock] = useState(stockQuantity);
+  const addToCart = useCartStore((state) => state.addToCart);
+  const toast = useToast();
+  const isOutOfStock = stockQuantity <= 0;
+  const detailsContent = (
+    <>
+      <div className="mb-4 flex h-32 w-full items-center justify-center rounded-lg bg-[#F4F5F7] text-5xl transition-transform duration-300 group-hover:scale-105 sm:h-36">
+        {image}
+      </div>
 
-  useEffect(() => {
-    let isMounted = true;
-
-    async function syncStock() {
-      try {
-        const response = await fetch('/api/inventory', { cache: 'no-store' });
-        const data = (await response.json()) as InventoryResponse;
-        const liveProduct = data.productStock?.find(
-          (item) => item.product_id === String(productId ?? id)
-        );
-
-        if (isMounted) {
-          setLiveStock(liveProduct?.qty_in_stock ?? 0);
-        }
-      } catch {
-        if (isMounted) setLiveStock((currentStock) => currentStock);
-      }
-    }
-
-    void syncStock();
-    const intervalId = window.setInterval(syncStock, 5000);
-
-    return () => {
-      isMounted = false;
-      window.clearInterval(intervalId);
-    };
-  }, [id, productId]);
-
-  const isOutOfStock = liveStock <= 0;
+      <span className="mb-1 text-[11px] font-bold text-gray-500">{weight}</span>
+      <h3 className="mb-3 h-9 text-xs font-bold leading-snug text-gray-800 line-clamp-2 sm:h-10 sm:text-sm">
+        {name}
+      </h3>
+    </>
+  );
 
   return (
     <div
@@ -80,14 +60,13 @@ export default function ProductCard({
         </span>
       )}
 
-      <div className="mb-4 flex h-32 w-full items-center justify-center rounded-lg bg-[#F4F5F7] text-5xl transition-transform duration-300 group-hover:scale-105 sm:h-36">
-        {image}
-      </div>
-
-      <span className="mb-1 text-[11px] font-bold text-gray-500">{weight}</span>
-      <h3 className="mb-3 h-9 text-xs font-bold leading-snug text-gray-800 line-clamp-2 sm:h-10 sm:text-sm">
-        {name}
-      </h3>
+      {productHref ? (
+        <Link href={productHref} className="block">
+          {detailsContent}
+        </Link>
+      ) : (
+        detailsContent
+      )}
 
       <div className="mt-auto flex items-center justify-between gap-3">
         <div className="flex flex-col">
@@ -103,7 +82,16 @@ export default function ProductCard({
           onClick={(event) => {
             event.stopPropagation();
             if (isOutOfStock) return;
-            alert(`${name} Added to cart!`);
+            addToCart(String(id), 1, {
+              productId: String(productId ?? id),
+              name,
+              image,
+              size: weight,
+              price,
+              originalPrice: oldPrice,
+              stock: stockQuantity,
+            });
+            toast.success(`${name} added to cart.`);
           }}
           disabled={isOutOfStock}
           className={`flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-black transition-colors sm:px-4 ${

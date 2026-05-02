@@ -31,8 +31,9 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     // Jab tak memory poori tarah read na ho jaye, Bouncer ko aaram karne do
     if (!isStoreReady) return;
 
-    const publicPaths = ['/login', '/register', '/forgot-password'];
-    const isPublicPath = publicPaths.includes(pathname);
+    const publicPaths = ['/login', '/register', '/forgot-password', '/', '/search', '/cart', '/subscribe'];
+    const publicPrefixes = ['/product/', '/category/'];
+    const isPublicPath = publicPaths.includes(pathname) || publicPrefixes.some((prefix) => pathname.startsWith(prefix));
 
     if (!isAuthenticated && !isPublicPath) {
       // Memory check hui aur sach mein Login nahi hai
@@ -54,8 +55,9 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   // 🔴 Jab tak memory check ho rahi hai, screen ko flash hone se roko
   if (!isStoreReady) return null;
 
-  const publicPaths = ['/login', '/register', '/forgot-password'];
-  const isPublicPath = publicPaths.includes(pathname);
+  const publicPaths = ['/login', '/register', '/forgot-password', '/', '/search', '/cart', '/subscribe'];
+  const publicPrefixes = ['/product/', '/category/'];
+  const isPublicPath = publicPaths.includes(pathname) || publicPrefixes.some((prefix) => pathname.startsWith(prefix));
   
   // Agar login nahi hai aur restricted page par hai, toh UI bilkul render mat karo
   if (!isAuthenticated && !isPublicPath) return null;

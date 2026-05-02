@@ -9,6 +9,7 @@ type CreateProductBundleInput = {
   productName: string;
   productTypeId: string;
   brandId?: string;
+  imageUrl?: string;
   originalPrice: number;
   productSalePrice?: number;
   description?: string;
@@ -16,7 +17,7 @@ type CreateProductBundleInput = {
   colorId?: string;
   itemOriginalPrice: number;
   itemSalePrice?: number;
-  sizeId: string;
+  sizeId?: string;
   qtyInStock: number;
 };
 
@@ -169,15 +170,43 @@ export async function createProductBundle(input: CreateProductBundleInput) {
   if (!productName) throw new Error('Product name is required.');
   if (!productCode) throw new Error('Product code is required.');
   if (!input.productTypeId) throw new Error('Product type is required.');
-  if (!input.sizeId) throw new Error('Size is required.');
 
   const originalPrice = parseMoney(input.originalPrice, 'Product original price') as number;
   const productSalePrice = parseMoney(input.productSalePrice, 'Product sale_price', false);
   const itemOriginalPrice = parseMoney(input.itemOriginalPrice, 'Item original price') as number;
   const itemSalePrice = parseMoney(input.itemSalePrice, 'Item sale_price', false);
   const qtyInStock = parseWholeNumber(input.qtyInStock, 'qty_in_stock');
+  const imageUrl = input.imageUrl?.trim();
 
   const product = await prisma.$transaction(async (tx) => {
+    let resolvedSizeId = input.sizeId?.trim();
+
+    if (!resolvedSizeId || resolvedSizeId === 'DEFAULT') {
+      const sizeCategory = await tx.sizeCategory.upsert({
+        where: { category_name: 'Default' },
+        update: {},
+        create: { category_name: 'Default' },
+      });
+
+      const defaultSize = await tx.sizeOption.findFirst({
+        where: {
+          size_name: 'Free Size / Default',
+          size_category_id: sizeCategory.size_category_id,
+        },
+      });
+
+      resolvedSizeId =
+        defaultSize?.size_id ??
+        (
+          await tx.sizeOption.create({
+            data: {
+              size_name: 'Free Size / Default',
+              size_category_id: sizeCategory.size_category_id,
+            },
+          })
+        ).size_id;
+    }
+
     return tx.product.create({
       data: {
         product_name: productName,
@@ -186,6 +215,13 @@ export async function createProductBundle(input: CreateProductBundleInput) {
         original_price: originalPrice,
         sale_price: productSalePrice,
         product_desc: input.description?.trim() || null,
+        productImages: imageUrl
+          ? {
+              create: {
+                image_filename: imageUrl,
+              },
+            }
+          : undefined,
         productItems: {
           create: {
             product_code: productCode,
@@ -194,7 +230,7 @@ export async function createProductBundle(input: CreateProductBundleInput) {
             sale_price: itemSalePrice,
             productVariants: {
               create: {
-                size_id: input.sizeId,
+                size_id: resolvedSizeId,
                 qty_in_stock: qtyInStock,
               },
             },

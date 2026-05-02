@@ -1,9 +1,9 @@
 'use client';
 
-import { Plus, TrendingUp } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { TrendingUp } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import ProductCard from '@/components/ui/ProductCard';
-import Modal from '@/components/ui/Modal';
+import Link from 'next/link';
 
 type StorefrontProduct = {
   id: string;
@@ -70,7 +70,6 @@ function mapInventoryItem(item: InventoryItem, productStock: ProductStock[]): St
 export default function TrendingProducts() {
   const [products, setProducts] = useState<StorefrontProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -97,25 +96,13 @@ export default function TrendingProducts() {
     }
 
     void loadLiveProducts();
-    const intervalId = window.setInterval(loadLiveProducts, 5000);
+    const intervalId = window.setInterval(loadLiveProducts, 30000);
 
     return () => {
       isMounted = false;
       window.clearInterval(intervalId);
     };
   }, []);
-
-  const selectedProduct = useMemo(
-    () => products.find((product) => product.id === selectedProductId) ?? null,
-    [products, selectedProductId]
-  );
-
-  const relatedProducts = useMemo(() => {
-    if (!selectedProduct) return [];
-    return products.filter(
-      (product) => product.category === selectedProduct.category && product.id !== selectedProduct.id
-    );
-  }, [products, selectedProduct]);
 
   return (
     <section className="relative z-0 mx-auto max-w-7xl px-6 pb-16">
@@ -129,6 +116,9 @@ export default function TrendingProducts() {
             <p className="mt-1 font-medium text-gray-500">Live stock from local inventory</p>
           </div>
         </div>
+        <Link href="/search" className="hidden rounded-lg border border-emerald-200 px-4 py-2 text-sm font-black text-emerald-700 transition hover:bg-emerald-50 sm:inline-flex">
+          View all products
+        </Link>
       </div>
 
       {isLoading ? (
@@ -153,62 +143,11 @@ export default function TrendingProducts() {
               image={product.image}
               tag={product.tag}
               stockQuantity={product.stockQuantity}
-              onCardClick={() => setSelectedProductId(product.id)}
+              productHref={`/product/${product.productId}`}
             />
           ))}
         </div>
       )}
-
-      <Modal isOpen={!!selectedProduct} onClose={() => setSelectedProductId(null)}>
-        {selectedProduct && (
-          <div className="flex flex-col">
-            <div className="mb-4 flex h-48 w-full items-center justify-center rounded-lg bg-[#F4F5F7] text-5xl shadow-inner">
-              {selectedProduct.image}
-            </div>
-            <span className="mb-1 text-xs font-black uppercase text-emerald-600">
-              {selectedProduct.category}
-            </span>
-            <h3 className="text-2xl font-black leading-tight text-gray-900">{selectedProduct.name}</h3>
-            <span className="mb-4 font-bold text-gray-500">{selectedProduct.weight}</span>
-
-            <div className="mb-6 flex items-center justify-between border-b border-gray-100 pb-6">
-              <div className="text-3xl font-black text-gray-950">INR {selectedProduct.price}</div>
-              <button
-                disabled={selectedProduct.stockQuantity <= 0}
-                className={`flex items-center gap-2 rounded-lg px-6 py-3 font-black shadow-lg transition active:scale-95 ${
-                  selectedProduct.stockQuantity <= 0
-                    ? 'cursor-not-allowed bg-gray-100 text-gray-400 shadow-none'
-                    : 'bg-emerald-600 text-white shadow-emerald-200 hover:bg-emerald-700'
-                }`}
-              >
-                {selectedProduct.stockQuantity <= 0 ? 'Out of Stock' : 'ADD TO CART'}
-                {selectedProduct.stockQuantity > 0 && <Plus className="h-5 w-5" />}
-              </button>
-            </div>
-
-            {relatedProducts.length > 0 && (
-              <div>
-                <h4 className="mb-3 text-sm font-black text-gray-900">You might also like</h4>
-                <div className="flex gap-3 overflow-x-auto pb-2">
-                  {relatedProducts.map((relatedProduct) => (
-                    <button
-                      key={relatedProduct.id}
-                      onClick={() => setSelectedProductId(relatedProduct.id)}
-                      className="min-w-[120px] rounded-lg border border-gray-100 bg-white p-2 text-left transition hover:border-emerald-500"
-                    >
-                      <div className="mb-2 flex h-16 w-full items-center justify-center rounded-lg bg-gray-50 text-3xl">
-                        {relatedProduct.image}
-                      </div>
-                      <p className="line-clamp-1 text-[10px] font-bold text-gray-800">{relatedProduct.name}</p>
-                      <p className="mt-1 text-xs font-black text-emerald-600">INR {relatedProduct.price}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
     </section>
   );
 }

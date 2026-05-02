@@ -1,39 +1,89 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
-export type CartItem = {
-  id: string;
+export type CartProductData = {
+  productId: string;
   name: string;
+  brand?: string | null;
+  image?: string | null;
+  size?: string | null;
+  color?: string | null;
   price: number;
+  originalPrice?: number | null;
+  stock?: number;
+};
+
+export type CartItem = CartProductData & {
+  variantId: string;
   quantity: number;
 };
 
 type CartState = {
   items: CartItem[];
-  addToCart: (item: CartItem) => void;
-  removeFromCart: (id: string) => void;
+  addToCart: (variantId: string, qty: number, productData: CartProductData) => void;
+  removeFromCart: (variantId: string) => void;
+  updateQty: (variantId: string, qty: number) => void;
   clearCart: () => void;
 };
 
-export const useCartStore = create<CartState>((set) => ({
-  items: [],
-  addToCart: (item) =>
-    set((state) => {
-      const existing = state.items.find((cartItem) => cartItem.id === item.id);
-      if (existing) {
-        return {
-          items: state.items.map((cartItem) =>
-            cartItem.id === item.id
-              ? { ...cartItem, quantity: cartItem.quantity + item.quantity }
-              : cartItem
-          ),
-        };
-      }
+function clampQty(qty: number, stock?: number) {
+  const nextQty = Math.max(1, Math.floor(qty));
+  return typeof stock === 'number' ? Math.min(nextQty, Math.max(1, stock)) : nextQty;
+}
 
-      return { items: [...state.items, item] };
+export const useCartStore = create<CartState>()(
+  persist(
+    (set) => ({
+      items: [],
+      addToCart: (variantId, qty, productData) =>
+        set((state) => {
+          const existing = state.items.find((item) => item.variantId === variantId);
+          const safeQty = clampQty(qty, productData.stock);
+
+          if (existing) {
+            return {
+              items: state.items.map((item) =>
+                item.variantId === variantId
+                  ? {
+                      ...item,
+                      ...productData,
+                      quantity: clampQty(item.quantity + safeQty, productData.stock),
+                    }
+                  : item
+              ),
+            };
+          }
+
+          return {
+            items: [
+              ...state.items,
+              {
+                ...productData,
+                variantId,
+                quantity: safeQty,
+              },
+            ],
+          };
+        }),
+      removeFromCart: (variantId) =>
+        set((state) => ({
+          items: state.items.filter((item) => item.variantId !== variantId),
+        })),
+      updateQty: (variantId, qty) =>
+        set((state) => ({
+          items:
+            qty <= 0
+              ? state.items.filter((item) => item.variantId !== variantId)
+              : state.items.map((item) =>
+                  item.variantId === variantId
+                    ? { ...item, quantity: clampQty(qty, item.stock) }
+                    : item
+                ),
+        })),
+      clearCart: () => set({ items: [] }),
     }),
-  removeFromCart: (id) =>
-    set((state) => ({
-      items: state.items.filter((item) => item.id !== id),
-    })),
-  clearCart: () => set({ items: [] }),
-}));
+    {
+      name: 'global-baniya-cart',
+    }
+  )
+);

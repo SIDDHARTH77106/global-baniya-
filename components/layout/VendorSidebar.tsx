@@ -2,14 +2,17 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import {
   AlertTriangle,
-  BarChart3,
+  Building2,
   Boxes,
   ClipboardList,
+  FileBarChart,
+  FileText,
   LayoutDashboard,
   PackageOpen,
+  ReceiptText,
   Settings,
   ShieldCheck,
-  Tags,
+  Truck,
   UsersRound,
   WalletCards,
 } from 'lucide-react';
@@ -22,25 +25,28 @@ type SidebarLink = {
 };
 
 const adminLinks: SidebarLink[] = [
-  { name: 'Overview', href: '/admin', icon: BarChart3 },
+  { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { name: 'Master Inventory', href: '/admin/inventory', icon: PackageOpen },
-  { name: 'Category Management', href: '/admin/categories', icon: Tags },
+  { name: 'All Orders', href: '/admin/orders', icon: ClipboardList },
   { name: 'Users', href: '/admin/users', icon: UsersRound },
+  { name: 'Payouts', href: '/admin/payouts', icon: WalletCards },
+  { name: 'Reports', href: '/admin/reports', icon: FileBarChart },
   { name: 'Settings', href: '/admin/settings', icon: Settings },
 ];
 
 const vendorLinksByRole: Record<'RETAILER' | 'WHOLESALER', SidebarLink[]> = {
   RETAILER: [
     { name: 'Dashboard', href: '/retailer/dashboard', icon: LayoutDashboard },
-    { name: 'My Orders', href: '/retailer/orders', icon: ClipboardList },
     { name: 'Low Stock Alerts', href: '/retailer/alerts', icon: AlertTriangle },
-    { name: 'Payouts', href: '/retailer/payouts', icon: WalletCards },
+    { name: 'Purchase Orders', href: '/retailer/purchase-orders', icon: ClipboardList },
+    { name: 'My Earnings', href: '/retailer/earnings', icon: WalletCards },
   ],
   WHOLESALER: [
     { name: 'Dashboard', href: '/wholesaler/dashboard', icon: LayoutDashboard },
-    { name: 'My Orders', href: '/wholesaler/orders', icon: ClipboardList },
-    { name: 'Low Stock Alerts', href: '/wholesaler/alerts', icon: AlertTriangle },
-    { name: 'Payouts', href: '/wholesaler/payouts', icon: WalletCards },
+    { name: 'My Bulk Orders', href: '/wholesaler/orders', icon: ClipboardList },
+    { name: 'Dispatch/Shipping', href: '/wholesaler/dispatch', icon: Truck },
+    { name: 'Invoices', href: '/wholesaler/invoices', icon: ReceiptText },
+    { name: 'Batch Tracking', href: '/wholesaler/batches', icon: FileText },
   ],
 };
 
@@ -81,7 +87,7 @@ export default async function VendorSidebar() {
         <div className="rounded-lg border border-white/10 bg-white/5 p-4">
           <div className="mb-3 flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-300">
-              {role === 'ADMIN' ? <ShieldCheck className="h-5 w-5" /> : <Boxes className="h-5 w-5" />}
+              {role === 'ADMIN' ? <ShieldCheck className="h-5 w-5" /> : role === 'WHOLESALER' ? <Building2 className="h-5 w-5" /> : <Boxes className="h-5 w-5" />}
             </div>
             <div>
               <p className="text-sm font-black">{roleLabel(role)}</p>
