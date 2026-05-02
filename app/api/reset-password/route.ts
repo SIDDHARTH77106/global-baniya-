@@ -11,17 +11,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Incorrect OTP!" }, { status: 400 });
     }
 
-    if (user.otpExpiry && new Date() > user.otpExpiry) {
-      return NextResponse.json({ success: false, error: "OTP expired. Please request a new one." }, { status: 400 });
-    }
-
     // OTP theek hai, ab naya password save kar do aur OTP delete kar do
     await prisma.user.update({
       where: { email },
       data: { 
         password: newPassword, 
-        otp: null, 
-        otpExpiry: null 
+        otp: null
       }
     });
 

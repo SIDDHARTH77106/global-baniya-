@@ -1,241 +1,184 @@
-'use client';
-
-import { useEffect, useMemo, useState } from 'react';
-import { Search, Save, AlertCircle, PackageOpen, Loader2 } from 'lucide-react';
+import { revalidatePath } from 'next/cache';
+import { AlertCircle, PackageOpen, Save } from 'lucide-react';
 import VendorSidebar from '@/components/layout/VendorSidebar';
+import { prisma } from '@/lib/prisma';
 
-type InventoryItem = {
-  id: string;
-  productName: string;
-  brand: string | null;
-  category: string | null;
-  variantName: string;
-  variantValue: string;
-  value: string;
-  unit: string;
-  sku: string;
-  mrp: number;
-  sellingPrice: number;
-  currency: string;
-  stockQuantity: number;
-  inStock: boolean;
-};
+export const dynamic = 'force-dynamic';
 
-export default function InventoryDashboard() {
-  const [items, setItems] = useState<InventoryItem[]>([]);
-  const [draftStock, setDraftStock] = useState<Record<string, number>>({});
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [savingId, setSavingId] = useState<string | null>(null);
-  const [error, setError] = useState('');
+function toNumber(value: unknown) {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return Number(value);
+  if (value && typeof value === 'object' && 'toString' in value) return Number(value.toString());
+  return 0;
+}
 
-  useEffect(() => {
-    let isMounted = true;
+async function updateInventory(formData: FormData) {
+  'use server';
 
-    async function loadInventory() {
-      try {
-        setIsLoading(true);
-        const response = await fetch('/api/inventory', { cache: 'no-store' });
-        const data = await response.json();
+  const variantId = String(formData.get('variantId') || '');
+  const qtyInStock = Number(formData.get('qty_in_stock'));
 
-        if (!response.ok || !data.success) {
-          throw new Error(data.error || 'Failed to load inventory.');
-        }
+  if (!variantId || !Number.isInteger(qtyInStock) || qtyInStock < 0) {
+    throw new Error('qty_in_stock must be a non-negative whole number.');
+  }
 
-        if (isMounted) {
-          const inventory = data.inventory as InventoryItem[];
-          setItems(inventory);
-          setDraftStock(
-            Object.fromEntries(inventory.map((item) => [item.id, item.stockQuantity]))
-          );
-        }
-      } catch (loadError) {
-        if (isMounted) {
-          setError(loadError instanceof Error ? loadError.message : 'Failed to load inventory.');
-        }
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
+  await prisma.productVariant.update({
+    where: { variant_id: variantId },
+    data: { qty_in_stock: qtyInStock },
+  });
 
-    loadInventory();
+  revalidatePath('/admin/inventory');
+}
 
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+async function getInventory() {
+  return prisma.productVariant.findMany({
+    orderBy: [{ qty_in_stock: 'asc' }, { variant_id: 'asc' }],
+    include: {
+      sizeOption: true,
+      productItem: {
+        include: {
+          color: true,
+          product: {
+            include: {
+              brand: true,
+              productType: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
 
-  const filteredItems = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim();
-    if (!query) return items;
-
-    return items.filter(
-      (item) =>
-        item.productName.toLowerCase().includes(query) ||
-        item.sku.toLowerCase().includes(query) ||
-        item.variantValue.toLowerCase().includes(query)
-    );
-  }, [items, searchQuery]);
-
-  const updateStock = async (item: InventoryItem) => {
-    const stockQuantity = draftStock[item.id];
-    if (!Number.isInteger(stockQuantity) || stockQuantity < 0) {
-      setError('Stock must be a non-negative whole number.');
-      return;
-    }
-
-    try {
-      setError('');
-      setSavingId(item.id);
-      const response = await fetch('/api/inventory', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subVariantId: item.id, stockQuantity }),
-      });
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to update stock.');
-      }
-
-      setItems((currentItems) =>
-        currentItems.map((currentItem) =>
-          currentItem.id === item.id
-            ? { ...currentItem, stockQuantity, inStock: stockQuantity > 0 }
-            : currentItem
-        )
-      );
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Failed to update stock.');
-    } finally {
-      setSavingId(null);
-    }
-  };
+export default async function InventoryDashboard() {
+  const inventory = await getInventory();
+  const totalUnits = inventory.reduce((sum, item) => sum + item.qty_in_stock, 0);
+  const lowStockCount = inventory.filter((item) => item.qty_in_stock > 0 && item.qty_in_stock <= 10).length;
+  const outOfStockCount = inventory.filter((item) => item.qty_in_stock === 0).length;
 
   return (
     <div className="min-h-screen bg-gray-50 lg:flex">
       <VendorSidebar />
 
       <main className="flex-1 p-4 md:p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-8 flex flex-col gap-4 border-b border-gray-200 pb-6 md:flex-row md:items-end md:justify-between">
             <div>
-              <h1 className="text-3xl font-black text-gray-900 flex items-center gap-3">
-                <PackageOpen className="w-8 h-8 text-emerald-600" /> Inventory Control
+              <h1 className="flex items-center gap-3 text-3xl font-black text-gray-950">
+                <PackageOpen className="h-8 w-8 text-emerald-600" />
+                Master Inventory Control
               </h1>
-              <p className="text-gray-500 font-medium mt-1">
-                Stock and price are maintained at the sub-variant SKU level.
+              <p className="mt-1 text-sm font-medium text-gray-500">
+                Stock is tracked strictly at ProductVariant.qty_in_stock.
               </p>
             </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search by product, variant, or SKU..."
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-          </div>
-
-          {error && (
-            <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-              {error}
-            </div>
-          )}
-
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            {isLoading ? (
-              <div className="flex items-center justify-center gap-3 p-12 text-gray-500 font-bold">
-                <Loader2 className="w-5 h-5 animate-spin" /> Loading inventory...
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-lg border border-gray-100 bg-white px-4 py-3">
+                <p className="text-lg font-black text-gray-950">{totalUnits}</p>
+                <p className="text-[10px] font-bold uppercase text-gray-400">Units</p>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead className="bg-gray-50 border-b border-gray-100">
-                    <tr>
-                      <th className="p-4 text-xs font-black text-gray-500 uppercase">Product & Variant</th>
-                      <th className="p-4 text-xs font-black text-gray-500 uppercase">SKU</th>
-                      <th className="p-4 text-xs font-black text-gray-500 uppercase">MRP</th>
-                      <th className="p-4 text-xs font-black text-gray-500 uppercase">Stock</th>
-                      <th className="p-4 text-xs font-black text-gray-500 uppercase text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredItems.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+              <div className="rounded-lg border border-yellow-100 bg-yellow-50 px-4 py-3">
+                <p className="text-lg font-black text-yellow-700">{lowStockCount}</p>
+                <p className="text-[10px] font-bold uppercase text-yellow-700">Low</p>
+              </div>
+              <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3">
+                <p className="text-lg font-black text-red-700">{outOfStockCount}</p>
+                <p className="text-[10px] font-bold uppercase text-red-700">Out</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="border-b border-gray-100 bg-gray-50">
+                  <tr>
+                    <th className="p-4 text-xs font-black uppercase text-gray-500">Product</th>
+                    <th className="p-4 text-xs font-black uppercase text-gray-500">ProductItem</th>
+                    <th className="p-4 text-xs font-black uppercase text-gray-500">Color</th>
+                    <th className="p-4 text-xs font-black uppercase text-gray-500">Size</th>
+                    <th className="p-4 text-xs font-black uppercase text-gray-500">Price</th>
+                    <th className="p-4 text-xs font-black uppercase text-gray-500">qty_in_stock</th>
+                    <th className="p-4 text-right text-xs font-black uppercase text-gray-500">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {inventory.map((variant) => {
+                    const item = variant.productItem;
+                    const product = item.product;
+                    const originalPrice = toNumber(item.original_price);
+                    const salePrice = item.sale_price ? toNumber(item.sale_price) : originalPrice;
+
+                    return (
+                      <tr key={variant.variant_id} className="hover:bg-gray-50">
                         <td className="p-4">
-                          <p className="font-bold text-gray-900">{item.productName}</p>
-                          <p className="text-[10px] font-bold text-emerald-600 uppercase bg-emerald-50 inline-block px-2 py-0.5 rounded mt-1">
-                            {item.variantName}: {item.variantValue} - {item.value}
-                            {item.unit}
+                          <p className="font-bold text-gray-950">{product.product_name}</p>
+                          <p className="mt-1 text-xs font-semibold text-gray-500">
+                            {product.brand?.brand_name ?? 'No brand'} / {product.productType.type_name}
                           </p>
                         </td>
-                        <td className="p-4 font-mono text-xs text-gray-600">{item.sku}</td>
-                        <td className="p-4 font-black text-gray-900">
-                          {item.currency} {item.mrp}
+                        <td className="p-4 font-mono text-xs font-bold text-gray-700">
+                          {item.product_code}
+                        </td>
+                        <td className="p-4 text-sm font-bold text-gray-700">
+                          {item.color?.color_name ?? 'Default'}
+                        </td>
+                        <td className="p-4 text-sm font-bold text-gray-700">{variant.sizeOption.size_name}</td>
+                        <td className="p-4">
+                          <p className="text-sm font-black text-gray-950">INR {salePrice}</p>
+                          {originalPrice > salePrice && (
+                            <p className="text-xs font-semibold text-gray-400 line-through">INR {originalPrice}</p>
+                          )}
                         </td>
                         <td className="p-4">
-                          <div className="flex flex-col gap-2">
+                          <form id={`inventory-${variant.variant_id}`} action={updateInventory} className="flex flex-col gap-2">
+                            <input type="hidden" name="variantId" value={variant.variant_id} />
                             <input
                               type="number"
                               min={0}
-                              value={draftStock[item.id] ?? item.stockQuantity}
-                              onChange={(event) =>
-                                setDraftStock((currentDraft) => ({
-                                  ...currentDraft,
-                                  [item.id]: Number(event.target.value),
-                                }))
-                              }
-                              className="w-28 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-black text-gray-900 outline-none focus:border-emerald-500"
+                              name="qty_in_stock"
+                              defaultValue={variant.qty_in_stock}
+                              className="w-28 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-black text-gray-950 outline-none focus:border-emerald-500"
                             />
-                            {item.stockQuantity > 10 ? (
-                              <span className="px-3 py-1 rounded-full text-[10px] font-black bg-green-100 text-green-700 uppercase w-fit">
-                                {item.stockQuantity} in stock
+                            {variant.qty_in_stock > 10 ? (
+                              <span className="w-fit rounded-full bg-green-100 px-3 py-1 text-[10px] font-black uppercase text-green-700">
+                                {variant.qty_in_stock} in stock
                               </span>
-                            ) : item.stockQuantity > 0 ? (
-                              <span className="px-3 py-1 rounded-full text-[10px] font-black bg-yellow-100 text-yellow-700 uppercase flex items-center gap-1 w-fit">
-                                <AlertCircle className="w-3 h-3" /> Low stock ({item.stockQuantity})
+                            ) : variant.qty_in_stock > 0 ? (
+                              <span className="flex w-fit items-center gap-1 rounded-full bg-yellow-100 px-3 py-1 text-[10px] font-black uppercase text-yellow-700">
+                                <AlertCircle className="h-3 w-3" /> Low stock
                               </span>
                             ) : (
-                              <span className="px-3 py-1 rounded-full text-[10px] font-black bg-red-100 text-red-700 uppercase w-fit">
+                              <span className="w-fit rounded-full bg-red-100 px-3 py-1 text-[10px] font-black uppercase text-red-700">
                                 Out of stock
                               </span>
                             )}
-                          </div>
+                          </form>
                         </td>
                         <td className="p-4 text-right">
                           <button
-                            onClick={() => updateStock(item)}
-                            disabled={savingId === item.id || draftStock[item.id] === item.stockQuantity}
-                            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            type="submit"
+                            form={`inventory-${variant.variant_id}`}
+                            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-black text-white transition hover:bg-emerald-700"
                           >
-                            {savingId === item.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Save className="w-4 h-4" />
-                            )}
+                            <Save className="h-4 w-4" />
                             Save
                           </button>
                         </td>
                       </tr>
-                    ))}
+                    );
+                  })}
 
-                    {filteredItems.length === 0 && (
-                      <tr>
-                        <td className="p-8 text-center text-sm font-bold text-gray-500" colSpan={5}>
-                          No inventory items found.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                  {inventory.length === 0 && (
+                    <tr>
+                      <td className="p-8 text-center text-sm font-bold text-gray-500" colSpan={7}>
+                        No ProductVariant rows exist yet. Add product items and size variants to track stock.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </main>

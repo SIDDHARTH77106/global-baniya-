@@ -13,14 +13,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Incorrect OTP! Please check your email." }, { status: 400 });
     }
 
-    if (user.otpExpiry && new Date() > user.otpExpiry) {
-      return NextResponse.json({ success: false, error: "OTP expired. go back generate new otp." }, { status: 400 });
-    }
     const updatedUser = await prisma.user.update({
       where: { email },
       data: { 
         otp: null, 
-        otpExpiry: null,
         phone: phone || user.phone,
         role: normalizeRole(role || user.role),
         password: password || user.password

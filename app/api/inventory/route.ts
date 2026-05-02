@@ -2,25 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { SESSION_COOKIE_NAME, readRoleSession } from '@/lib/auth-session';
 
-type InventorySubVariant = {
-  id: string;
-  productId: string;
-  productName: string;
-  brand: string | null;
-  category: string | null;
-  image: string | null;
-  variantId: string;
-  variantName: string;
-  variantValue: string;
-  value: string;
-  unit: string;
-  sku: string;
-  mrp: number;
-  sellingPrice: number;
-  currency: string;
-  stockQuantity: number;
-  inStock: boolean;
-};
+export const dynamic = 'force-dynamic';
 
 function toNumber(value: unknown) {
   if (typeof value === 'number') return value;
@@ -29,53 +11,102 @@ function toNumber(value: unknown) {
   return 0;
 }
 
-function flattenInventory(products: Awaited<ReturnType<typeof getProducts>>) {
-  return products.flatMap((product) =>
-    product.variants.flatMap((variant) =>
-      variant.subVariants.map<InventorySubVariant>((subVariant) => {
-        const mrp = toNumber(subVariant.mrp);
-        const sellingPrice = subVariant.sellingPrice ? toNumber(subVariant.sellingPrice) : mrp;
-
-        return {
-          id: subVariant.id,
-          productId: product.id,
-          productName: product.shortTitle,
-          brand: product.brand,
-          category: product.category,
-          image: product.image,
-          variantId: variant.id,
-          variantName: variant.name,
-          variantValue: variant.value,
-          value: subVariant.value,
-          unit: subVariant.unit,
-          sku: subVariant.sku,
-          mrp,
-          sellingPrice,
-          currency: subVariant.currency,
-          stockQuantity: subVariant.stockQuantity,
-          inStock: subVariant.stockQuantity > 0,
-        };
-      })
-    )
-  );
-}
-
-async function getProducts() {
-  return prisma.product.findMany({
-    where: { isActive: true },
-    orderBy: { createdAt: 'desc' },
+async function getProductVariants(availableOnly = false) {
+  return prisma.productVariant.findMany({
+    where: availableOnly ? { qty_in_stock: { gt: 0 } } : undefined,
+    orderBy: [{ qty_in_stock: 'asc' }, { variant_id: 'asc' }],
     include: {
-      variants: {
-        orderBy: { sortOrder: 'asc' },
+      sizeOption: true,
+      productItem: {
         include: {
-          subVariants: {
-            where: { isActive: true },
-            orderBy: { createdAt: 'asc' },
+          color: true,
+          product: {
+            include: {
+              brand: true,
+              productType: true,
+              productImages: { take: 1 },
+            },
           },
         },
       },
     },
   });
+}
+
+function serializeProductVariant(variant: Awaited<ReturnType<typeof getProductVariants>>[number]) {
+  const productItem = variant.productItem;
+  const product = productItem.product;
+  const originalPrice = toNumber(productItem.original_price);
+  const salePrice = productItem.sale_price ? toNumber(productItem.sale_price) : originalPrice;
+
+  return {
+    id: variant.variant_id,
+    variant_id: variant.variant_id,
+    product_item_id: variant.product_item_id,
+    size_id: variant.size_id,
+    size_name: variant.sizeOption.size_name,
+    qty_in_stock: variant.qty_in_stock,
+    quantity_in_stock: variant.qty_in_stock,
+    inStock: variant.qty_in_stock > 0,
+    product_item: {
+      product_item_id: productItem.product_item_id,
+      product_code: productItem.product_code,
+      color_id: productItem.color_id,
+      color_name: productItem.color?.color_name ?? null,
+      original_price: originalPrice,
+      sale_price: salePrice,
+    },
+    product: {
+      product_id: product.product_id,
+      id: product.product_id,
+      name: product.product_name,
+      product_name: product.product_name,
+      description: product.product_desc,
+      brand_name: product.brand?.brand_name ?? null,
+      type_name: product.productType.type_name,
+      image_filename: product.productImages[0]?.image_filename ?? null,
+    },
+  };
+}
+
+async function getProductStockTotals() {
+  const totals = await prisma.productVariant.groupBy({
+    by: ['product_item_id'],
+    _sum: { qty_in_stock: true },
+  });
+
+  const productItems = await prisma.productItem.findMany({
+    where: {
+      product_item_id: {
+        in: totals.map((total) => total.product_item_id),
+      },
+    },
+    select: {
+      product_item_id: true,
+      product_id: true,
+    },
+  });
+
+  const itemProductMap = new Map(
+    productItems.map((item) => [item.product_item_id, item.product_id])
+  );
+  const productTotals = new Map<string, number>();
+
+  for (const total of totals) {
+    const productId = itemProductMap.get(total.product_item_id);
+    if (!productId) continue;
+
+    productTotals.set(
+      productId,
+      (productTotals.get(productId) ?? 0) + (total._sum.qty_in_stock ?? 0)
+    );
+  }
+
+  return Array.from(productTotals.entries()).map(([product_id, qty_in_stock]) => ({
+    product_id,
+    qty_in_stock,
+    inStock: qty_in_stock > 0,
+  }));
 }
 
 function assertInventoryWriter(request: NextRequest) {
@@ -94,12 +125,15 @@ function assertInventoryWriter(request: NextRequest) {
 
 export async function GET() {
   try {
-    const products = await getProducts();
+    const [variants, productStock] = await Promise.all([
+      getProductVariants(true),
+      getProductStockTotals(),
+    ]);
 
     return NextResponse.json({
       success: true,
-      products,
-      inventory: flattenInventory(products),
+      inventory: variants.map(serializeProductVariant),
+      productStock,
     });
   } catch (error) {
     console.error('Inventory fetch error:', error);
@@ -112,27 +146,32 @@ export async function PUT(request: NextRequest) {
   if (deniedResponse) return deniedResponse;
 
   try {
-    const { subVariantId, stockQuantity, mrp, sellingPrice } = await request.json();
-    const parsedStock = Number(stockQuantity);
+    const { variantId, variant_id, qty_in_stock } = await request.json();
+    const resolvedVariantId = variantId || variant_id;
+    const parsedStock = Number(qty_in_stock);
 
-    if (!subVariantId || !Number.isInteger(parsedStock) || parsedStock < 0) {
+    if (!resolvedVariantId || !Number.isInteger(parsedStock) || parsedStock < 0) {
       return NextResponse.json(
-        { success: false, error: 'subVariantId and a non-negative stockQuantity are required.' },
+        { success: false, error: 'variantId and a non-negative qty_in_stock are required.' },
         { status: 400 }
       );
     }
 
-    const updatedSubVariant = await prisma.subVariant.update({
-      where: { id: subVariantId },
-      data: {
-        stockQuantity: parsedStock,
-        ...(mrp !== undefined ? { mrp: Number(mrp) } : {}),
-        ...(sellingPrice !== undefined ? { sellingPrice: Number(sellingPrice) } : {}),
-      },
+    const updatedVariant = await prisma.productVariant.update({
+      where: { variant_id: resolvedVariantId },
+      data: { qty_in_stock: parsedStock },
       include: {
-        variant: {
+        sizeOption: true,
+        productItem: {
           include: {
-            product: true,
+            color: true,
+            product: {
+              include: {
+                brand: true,
+                productType: true,
+                productImages: { take: 1 },
+              },
+            },
           },
         },
       },
@@ -140,27 +179,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      item: {
-        id: updatedSubVariant.id,
-        productId: updatedSubVariant.variant.product.id,
-        productName: updatedSubVariant.variant.product.shortTitle,
-        brand: updatedSubVariant.variant.product.brand,
-        category: updatedSubVariant.variant.product.category,
-        image: updatedSubVariant.variant.product.image,
-        variantId: updatedSubVariant.variant.id,
-        variantName: updatedSubVariant.variant.name,
-        variantValue: updatedSubVariant.variant.value,
-        value: updatedSubVariant.value,
-        unit: updatedSubVariant.unit,
-        sku: updatedSubVariant.sku,
-        mrp: toNumber(updatedSubVariant.mrp),
-        sellingPrice: updatedSubVariant.sellingPrice
-          ? toNumber(updatedSubVariant.sellingPrice)
-          : toNumber(updatedSubVariant.mrp),
-        currency: updatedSubVariant.currency,
-        stockQuantity: updatedSubVariant.stockQuantity,
-        inStock: updatedSubVariant.stockQuantity > 0,
-      },
+      item: serializeProductVariant(updatedVariant),
     });
   } catch (error) {
     console.error('Inventory update error:', error);

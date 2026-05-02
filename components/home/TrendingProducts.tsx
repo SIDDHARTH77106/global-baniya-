@@ -1,12 +1,13 @@
 'use client';
 
-import { TrendingUp, Plus } from 'lucide-react';
+import { Plus, TrendingUp } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import ProductCard from '@/components/ui/ProductCard';
 import Modal from '@/components/ui/Modal';
 
 type StorefrontProduct = {
   id: string;
+  productId: string;
   name: string;
   weight: string;
   price: number;
@@ -19,58 +20,57 @@ type StorefrontProduct = {
 
 type InventoryItem = {
   id: string;
-  productName: string;
-  category: string | null;
-  image: string | null;
-  value: string;
-  unit: string;
-  mrp: number;
-  sellingPrice: number;
-  stockQuantity: number;
+  product_item_id: string;
+  size_name: string;
+  qty_in_stock: number;
+  product_item: {
+    product_code: string;
+    color_name: string | null;
+    original_price: number;
+    sale_price: number;
+  };
+  product: {
+    product_id: string;
+    name: string;
+    image_filename: string | null;
+    type_name: string;
+  };
 };
 
-const fallbackProducts: StorefrontProduct[] = [
-  {
-    id: 'fallback-1',
-    name: 'Amul Taaza Toned Fresh Milk',
-    weight: '500 ml',
-    price: 27,
-    oldPrice: 28,
-    image: '🥛',
-    tag: 'HOT',
-    category: 'Dairy',
-    stockQuantity: 12,
-  },
-  {
-    id: 'fallback-2',
-    name: 'Aashirvaad Shudh Chakki Atta',
-    weight: '5 kg',
-    price: 210,
-    oldPrice: 250,
-    image: '🌾',
-    tag: '16% OFF',
-    category: 'Grocery',
-    stockQuantity: 8,
-  },
-];
+type ProductStock = {
+  product_id: string;
+  qty_in_stock: number;
+};
 
-function mapInventoryItem(item: InventoryItem): StorefrontProduct {
+function mapInventoryItem(item: InventoryItem, productStock: ProductStock[]): StorefrontProduct {
+  const totalStock = productStock.find((stock) => stock.product_id === item.product.product_id)?.qty_in_stock ?? 0;
+  const weightParts = [
+    item.product_item.color_name,
+    item.size_name,
+    item.product_item.product_code,
+  ].filter(Boolean);
+
   return {
     id: item.id,
-    name: item.productName,
-    weight: `${item.value} ${item.unit}`.trim(),
-    price: item.sellingPrice,
-    oldPrice: item.mrp > item.sellingPrice ? item.mrp : undefined,
-    image: item.image || '🛒',
-    tag: item.stockQuantity <= 5 && item.stockQuantity > 0 ? 'LOW STOCK' : undefined,
-    category: item.category || 'Grocery',
-    stockQuantity: item.stockQuantity,
+    productId: item.product.product_id,
+    name: item.product.name,
+    weight: weightParts.join(' / '),
+    price: item.product_item.sale_price,
+    oldPrice:
+      item.product_item.original_price > item.product_item.sale_price
+        ? item.product_item.original_price
+        : undefined,
+    image: item.product.image_filename || '/globe.svg',
+    tag: totalStock <= 5 && totalStock > 0 ? 'LOW STOCK' : undefined,
+    category: item.product.type_name,
+    stockQuantity: totalStock,
   };
 }
 
 export default function TrendingProducts() {
-  const [products, setProducts] = useState<StorefrontProduct[]>(fallbackProducts);
-  const [selectedProduct, setSelectedProduct] = useState<StorefrontProduct | null>(null);
+  const [products, setProducts] = useState<StorefrontProduct[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -80,23 +80,35 @@ export default function TrendingProducts() {
         const response = await fetch('/api/inventory', { cache: 'no-store' });
         const data = await response.json();
 
-        if (!response.ok || !data.success) return;
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'Inventory unavailable');
+        }
 
-        const liveProducts = (data.inventory as InventoryItem[]).slice(0, 10).map(mapInventoryItem);
-        if (isMounted && liveProducts.length > 0) {
-          setProducts(liveProducts);
+        if (isMounted) {
+          const inventory = data.inventory as InventoryItem[];
+          const productStock = (data.productStock || []) as ProductStock[];
+          setProducts(inventory.slice(0, 10).map((item) => mapInventoryItem(item, productStock)));
         }
       } catch {
-        // Keep the fallback products visible if the API is unavailable during local setup.
+        if (isMounted) setProducts([]);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
 
-    loadLiveProducts();
+    void loadLiveProducts();
+    const intervalId = window.setInterval(loadLiveProducts, 5000);
 
     return () => {
       isMounted = false;
+      window.clearInterval(intervalId);
     };
   }, []);
+
+  const selectedProduct = useMemo(
+    () => products.find((product) => product.id === selectedProductId) ?? null,
+    [products, selectedProductId]
+  );
 
   const relatedProducts = useMemo(() => {
     if (!selectedProduct) return [];
@@ -106,81 +118,90 @@ export default function TrendingProducts() {
   }, [products, selectedProduct]);
 
   return (
-    <section className="pb-16 max-w-7xl mx-auto px-6 relative z-0">
-      <div className="flex justify-between items-center mb-8">
+    <section className="relative z-0 mx-auto max-w-7xl px-6 pb-16">
+      <div className="mb-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-500">
-            <TrendingUp className="w-6 h-6" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-500">
+            <TrendingUp className="h-6 w-6" />
           </div>
           <div>
-            <h2 className="text-3xl font-black text-gray-950 tracking-tight">Trending in Pune</h2>
-            <p className="text-gray-500 font-medium mt-1">Live stock from local inventory</p>
+            <h2 className="text-3xl font-black tracking-tight text-gray-950">Trending in Pune</h2>
+            <p className="mt-1 font-medium text-gray-500">Live stock from local inventory</p>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
-        {products.map((product) => (
-          <ProductCard
-            key={product.id}
-            id={product.id}
-            name={product.name}
-            weight={product.weight}
-            price={product.price}
-            oldPrice={product.oldPrice}
-            image={product.image}
-            tag={product.tag}
-            stockQuantity={product.stockQuantity}
-            onCardClick={() => setSelectedProduct(product)}
-          />
-        ))}
-      </div>
+      {isLoading ? (
+        <div className="rounded-lg border border-gray-100 bg-white p-8 text-center text-sm font-bold text-gray-500">
+          Loading live inventory...
+        </div>
+      ) : products.length === 0 ? (
+        <div className="rounded-lg border border-gray-100 bg-white p-8 text-center text-sm font-bold text-gray-500">
+          No in-stock ProductItem variants are available yet.
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6 lg:grid-cols-5">
+          {products.map((product) => (
+            <ProductCard
+              key={product.id}
+              id={product.id}
+              productId={product.productId}
+              name={product.name}
+              weight={product.weight}
+              price={product.price}
+              oldPrice={product.oldPrice}
+              image={product.image}
+              tag={product.tag}
+              stockQuantity={product.stockQuantity}
+              onCardClick={() => setSelectedProductId(product.id)}
+            />
+          ))}
+        </div>
+      )}
 
-      <Modal isOpen={!!selectedProduct} onClose={() => setSelectedProduct(null)}>
+      <Modal isOpen={!!selectedProduct} onClose={() => setSelectedProductId(null)}>
         {selectedProduct && (
           <div className="flex flex-col">
-            <div className="w-full h-48 bg-[#F4F5F7] rounded-2xl flex items-center justify-center text-8xl mb-4 shadow-inner">
+            <div className="mb-4 flex h-48 w-full items-center justify-center rounded-lg bg-[#F4F5F7] text-5xl shadow-inner">
               {selectedProduct.image}
             </div>
-            <span className="text-emerald-600 font-black text-xs uppercase mb-1">
+            <span className="mb-1 text-xs font-black uppercase text-emerald-600">
               {selectedProduct.category}
             </span>
-            <h3 className="text-2xl font-black text-gray-900 leading-tight">{selectedProduct.name}</h3>
-            <span className="text-gray-500 font-bold mb-4">{selectedProduct.weight}</span>
+            <h3 className="text-2xl font-black leading-tight text-gray-900">{selectedProduct.name}</h3>
+            <span className="mb-4 font-bold text-gray-500">{selectedProduct.weight}</span>
 
-            <div className="flex items-center justify-between mb-6 pb-6 border-b border-gray-100">
-              <div className="text-3xl font-black text-gray-950">₹{selectedProduct.price}</div>
+            <div className="mb-6 flex items-center justify-between border-b border-gray-100 pb-6">
+              <div className="text-3xl font-black text-gray-950">INR {selectedProduct.price}</div>
               <button
                 disabled={selectedProduct.stockQuantity <= 0}
-                className={`px-6 py-3 rounded-xl font-black shadow-lg transition active:scale-95 flex items-center gap-2 ${
+                className={`flex items-center gap-2 rounded-lg px-6 py-3 font-black shadow-lg transition active:scale-95 ${
                   selectedProduct.stockQuantity <= 0
                     ? 'cursor-not-allowed bg-gray-100 text-gray-400 shadow-none'
                     : 'bg-emerald-600 text-white shadow-emerald-200 hover:bg-emerald-700'
                 }`}
               >
-                {selectedProduct.stockQuantity <= 0 ? 'OUT OF STOCK' : 'ADD TO CART'}
-                {selectedProduct.stockQuantity > 0 && <Plus className="w-5 h-5" />}
+                {selectedProduct.stockQuantity <= 0 ? 'Out of Stock' : 'ADD TO CART'}
+                {selectedProduct.stockQuantity > 0 && <Plus className="h-5 w-5" />}
               </button>
             </div>
 
             {relatedProducts.length > 0 && (
               <div>
-                <h4 className="text-sm font-black text-gray-900 mb-3">You might also like</h4>
-                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                <h4 className="mb-3 text-sm font-black text-gray-900">You might also like</h4>
+                <div className="flex gap-3 overflow-x-auto pb-2">
                   {relatedProducts.map((relatedProduct) => (
-                    <div
+                    <button
                       key={relatedProduct.id}
-                      onClick={() => setSelectedProduct(relatedProduct)}
-                      className="min-w-[120px] bg-white border border-gray-100 rounded-xl p-2 cursor-pointer hover:border-emerald-500 transition"
+                      onClick={() => setSelectedProductId(relatedProduct.id)}
+                      className="min-w-[120px] rounded-lg border border-gray-100 bg-white p-2 text-left transition hover:border-emerald-500"
                     >
-                      <div className="w-full h-16 bg-gray-50 rounded-lg flex items-center justify-center text-3xl mb-2">
+                      <div className="mb-2 flex h-16 w-full items-center justify-center rounded-lg bg-gray-50 text-3xl">
                         {relatedProduct.image}
                       </div>
-                      <p className="text-[10px] font-bold text-gray-800 line-clamp-1">
-                        {relatedProduct.name}
-                      </p>
-                      <p className="text-xs font-black text-emerald-600 mt-1">₹{relatedProduct.price}</p>
-                    </div>
+                      <p className="line-clamp-1 text-[10px] font-bold text-gray-800">{relatedProduct.name}</p>
+                      <p className="mt-1 text-xs font-black text-emerald-600">INR {relatedProduct.price}</p>
+                    </button>
                   ))}
                 </div>
               </div>

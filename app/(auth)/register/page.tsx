@@ -1,233 +1,258 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/store/authStore"; 
-import { Mail, Smartphone, CheckCircle2, Store, Lock, Eye, EyeOff } from "lucide-react";
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { FormEvent, useState } from 'react';
+import { CheckCircle2, Eye, EyeOff, Lock, Mail, ShieldCheck, Store, UserRound } from 'lucide-react';
+import { useAuthStore } from '@/store/authStore';
+
+type Role = 'CUSTOMER' | 'RETAILER' | 'WHOLESALER';
 
 export default function RegisterPage() {
   const router = useRouter();
   const login = useAuthStore((state) => state.login);
+  const [step, setStep] = useState<'details' | 'otp'>('details');
+  const [name, setName] = useState('');
+  const [contact, setContact] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState<Role>('CUSTOMER');
+  const [otp, setOtp] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
 
-  const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    password: "", // 🔴 Naya Password field
-    role: "Customer (Buy Groceries)", 
-  });
-  
-  const [otp, setOtp] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [showPassword, setShowPassword] = useState(false); // 🔴 Password dikhane/chhupane ka state
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  // 1. Request OTP from Backend
-  const handleRequestOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsProcessing(true);
-
-    if (formData.phone.length < 10) {
-      alert("Please enter a valid 10-digit mobile number");
-      setIsProcessing(false);
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      alert("Password kam se kam 6 characters ka hona chahiye");
-      setIsProcessing(false);
-      return;
-    }
+  async function handleRegistrationRequest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSubmitting(true);
+    setMessage('');
 
     try {
-      const response = await fetch('/api/send-otp', {
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: formData.email, name: `${formData.firstName} ${formData.lastName}` })
+        body: JSON.stringify({ name, contact, password, role, action: 'request' }),
       });
-
       const data = await response.json();
 
-      if (data.success) {
-        setIsProcessing(false);
-        setStep(2); 
-      } else {
-        alert(data.error || "Failed to send OTP.");
-        setIsProcessing(false);
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Registration failed.');
       }
-    } catch (error) {
-      alert("Server Error! Make sure API route is correct.");
-      setIsProcessing(false);
-    }
-  };
 
-  // 2. Verify OTP with Backend
-  const handleVerifyAndRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsProcessing(true);
+      setStep('otp');
+      setMessage('OTP sent. Verify it to activate your account.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Registration failed.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleOtpVerification(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSubmitting(true);
+    setMessage('');
 
     try {
-      // 🔴 Ab hum DB se OTP match karwayenge aur baaki data save karwayenge
-      const response = await fetch('/api/verify-otp', {
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          email: formData.email, 
-          otp: otp,
-          phone: formData.phone,
-          password: formData.password,
-          role: formData.role.includes("Retailer") ? "RETAILER" : formData.role.includes("Wholesaler") ? "WHOLESALER" : "CUSTOMER"
-        })
+        body: JSON.stringify({ otp, action: 'verify' }),
       });
-
       const data = await response.json();
 
-      if (data.success) {
-        login(data.userData); 
-        
-        if (data.userData.role === "RETAILER") router.push("/retailer/dashboard");
-        else if (data.userData.role === "WHOLESALER") router.push("/wholesaler/dashboard");
-        else if (data.userData.role === "ADMIN") router.push("/admin/inventory");
-        else router.push("/");
-      } else {
-        alert(data.error); // Yahan aayega Incorrect ya Expired OTP ka alert
-        setIsProcessing(false);
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'OTP verification failed.');
       }
+
+      login(data.userData);
+      router.push(data.redirectTo);
     } catch (error) {
-      alert("Verification failed due to server error.");
-      setIsProcessing(false);
+      setMessage(error instanceof Error ? error.message : 'OTP verification failed.');
+    } finally {
+      setIsSubmitting(false);
     }
-  };
+  }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4 sm:p-8">
-      <div className="w-full max-w-md rounded-[24px] bg-white p-6 sm:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100">
-        
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
-            <Store className="h-7 w-7 sm:h-8 sm:w-8" />
+    <div className="min-h-screen bg-gray-50 px-4 py-10 sm:px-6">
+      <div className="mx-auto grid min-h-[calc(100vh-5rem)] max-w-6xl overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm lg:grid-cols-[440px_1fr]">
+        <section className="hidden bg-emerald-700 p-10 text-white lg:flex lg:flex-col lg:justify-between">
+          <div>
+            <div className="mb-10 flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-white text-emerald-700">
+                <Store className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-xl font-black">Global Baniya</p>
+                <p className="text-sm font-semibold text-emerald-100">Create a secure account.</p>
+              </div>
+            </div>
+            <h1 className="text-5xl font-black leading-tight">Start selling, buying, or supplying locally.</h1>
+            <p className="mt-5 text-base font-medium text-emerald-50">
+              Your role controls your dashboard and permissions from the first sign-in.
+            </p>
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Join Global Baniya</h1>
-          <p className="mt-2 text-xs sm:text-sm text-gray-500">
-            {step === 1 ? "Enter your details to get started" : "Verify your identity"}
-          </p>
-        </div>
 
-        {step === 1 ? (
-          <form onSubmit={handleRequestOtp} className="space-y-4 sm:space-y-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="mb-1.5 block text-xs sm:text-sm font-medium text-gray-700">First Name</label>
-                <input required name="firstName" value={formData.firstName} onChange={handleChange} type="text" placeholder="John" className="block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10" />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs sm:text-sm font-medium text-gray-700">Last Name</label>
-                <input required name="lastName" value={formData.lastName} onChange={handleChange} type="text" placeholder="Doe" className="block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10" />
-              </div>
+          <div className="rounded-lg bg-white/10 p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5" />
+              <p className="text-sm font-black">Secure by default</p>
+            </div>
+            <p className="text-sm font-medium text-emerald-50">
+              Passwords are hashed and accounts are created only after OTP verification.
+            </p>
+          </div>
+        </section>
+
+        <section className="flex items-center p-6 sm:p-10">
+          <div className="mx-auto w-full max-w-md">
+            <div className="mb-8">
+              <p className="text-sm font-black uppercase tracking-wide text-emerald-700">Create account</p>
+              <h2 className="mt-2 text-3xl font-black text-gray-950">
+                {step === 'details' ? 'Join Global Baniya' : 'Verify your email'}
+              </h2>
+              <p className="mt-2 text-sm font-medium text-gray-500">
+                {step === 'details'
+                  ? 'Choose your role and secure your account.'
+                  : 'Enter the 6-digit OTP sent to your email.'}
+              </p>
             </div>
 
-            <div>
-              <label className="mb-1.5 block text-xs sm:text-sm font-medium text-gray-700">Email Address</label>
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                  <Mail className="h-5 w-5 text-gray-400" />
-                </div>
-                <input required name="email" value={formData.email} onChange={handleChange} type="email" placeholder="name@example.com" className="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-12 pr-4 text-sm outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10" />
+            {message && (
+              <div className="mb-5 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
+                {message}
               </div>
-            </div>
+            )}
 
-            <div>
-              <label className="mb-1.5 block text-xs sm:text-sm font-medium text-gray-700">Mobile Number</label>
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                  <Smartphone className="h-5 w-5 text-gray-400" />
-                  <span className="ml-2 font-medium text-gray-500">+91</span>
+            {step === 'details' ? (
+              <form onSubmit={handleRegistrationRequest} className="space-y-5">
+                <div>
+                  <label className="mb-1.5 block text-sm font-bold text-gray-700">Name</label>
+                  <div className="relative">
+                    <UserRound className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                    <input
+                      required
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      className="w-full rounded-lg border border-gray-200 bg-gray-50 py-3 pl-12 pr-4 text-sm font-semibold outline-none transition focus:border-emerald-500 focus:bg-white"
+                      placeholder="Your full name"
+                    />
+                  </div>
                 </div>
-                <input required name="phone" maxLength={10} value={formData.phone} onChange={handleChange} type="tel" placeholder="9876543210" className="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-20 pr-4 text-sm outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10" />
-              </div>
-            </div>
 
-            {/* 🔴 PASSWORD FIELD WITH SHOW/HIDE TOGGLE */}
-            <div>
-              <label className="mb-1.5 block text-xs sm:text-sm font-medium text-gray-700">Create Password</label>
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                  <Lock className="h-5 w-5 text-gray-400" />
+                <div>
+                  <label className="mb-1.5 block text-sm font-bold text-gray-700">Email or Phone</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                    <input
+                      required
+                      value={contact}
+                      onChange={(event) => setContact(event.target.value)}
+                      className="w-full rounded-lg border border-gray-200 bg-gray-50 py-3 pl-12 pr-4 text-sm font-semibold outline-none transition focus:border-emerald-500 focus:bg-white"
+                      placeholder="name@example.com"
+                    />
+                  </div>
                 </div>
-                <input 
-                  required 
-                  name="password" 
-                  value={formData.password} 
-                  onChange={handleChange} 
-                  type={showPassword ? "text" : "password"} 
-                  placeholder="••••••••" 
-                  className="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-12 pr-12 text-sm outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10" 
-                />
-                <button 
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-500 hover:text-emerald-600 transition"
+
+                <div>
+                  <label className="mb-1.5 block text-sm font-bold text-gray-700">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                    <input
+                      required
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      type={showPassword ? 'text' : 'password'}
+                      className="w-full rounded-lg border border-gray-200 bg-gray-50 py-3 pl-12 pr-12 text-sm font-semibold outline-none transition focus:border-emerald-500 focus:bg-white"
+                      placeholder="At least 8 characters"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((current) => !current)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-700"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-sm font-bold text-gray-700">Role</label>
+                  <select
+                    value={role}
+                    onChange={(event) => setRole(event.target.value as Role)}
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-black text-gray-700 outline-none transition focus:border-emerald-500 focus:bg-white"
+                  >
+                    <option value="CUSTOMER">Customer</option>
+                    <option value="RETAILER">Retailer</option>
+                    <option value="WHOLESALER">Wholesaler</option>
+                  </select>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full rounded-lg bg-emerald-600 py-3.5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  {isSubmitting ? 'Sending OTP...' : 'Send OTP'}
                 </button>
-              </div>
-            </div>
+              </form>
+            ) : (
+              <form onSubmit={handleOtpVerification} className="space-y-5">
+                <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-700" />
+                    <p className="text-sm font-bold text-emerald-800">
+                      We sent a verification code to {contact}.
+                    </p>
+                  </div>
+                </div>
 
-            <div>
-              <label className="mb-1.5 block text-xs sm:text-sm font-medium text-gray-700">Select Your Role</label>
-              <select name="role" value={formData.role} onChange={handleChange} className="block w-full cursor-pointer rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10">
-                <option value="Customer (Buy Groceries)">Customer (Buy Groceries)</option>
-                <option value="Retailer (Local Shop)">Retailer (Local Shop)</option>
-                <option value="Wholesaler (Bulk Supply)">Wholesaler (Bulk Supply)</option>
-              </select>
-            </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-bold text-gray-700">OTP</label>
+                  <input
+                    required
+                    value={otp}
+                    onChange={(event) => setOtp(event.target.value.replace(/\D/g, ''))}
+                    maxLength={6}
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 py-3 text-center text-xl font-black tracking-[0.45em] outline-none transition focus:border-emerald-500 focus:bg-white"
+                    placeholder="000000"
+                  />
+                </div>
 
-            <button type="submit" disabled={isProcessing} className="mt-2 flex w-full items-center justify-center rounded-xl bg-emerald-600 px-4 py-3.5 text-sm font-semibold text-white transition-all hover:bg-emerald-700 focus:ring-4 focus:ring-emerald-500/20 active:scale-[0.98] disabled:opacity-70">
-              {isProcessing ? "Sending OTP..." : "Get Verification OTP"}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleVerifyAndRegister} className="space-y-6">
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-600" />
-                <p className="text-sm font-medium text-emerald-800">
-                  We've sent a secure 6-digit OTP to your email.
-                </p>
-              </div>
-            </div>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full rounded-lg bg-emerald-600 py-3.5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSubmitting ? 'Creating account...' : 'Verify and Create Account'}
+                </button>
 
-            <div>
-              <label className="mb-2 block text-center text-xs sm:text-sm font-semibold tracking-wide text-gray-600">ENTER OTP</label>
-              <input type="text" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))} placeholder="••••••" className="block w-full rounded-xl border border-gray-200 bg-gray-50 py-4 text-center text-2xl font-bold tracking-[0.5em] text-gray-900 outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10" />
-            </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep('details');
+                    setOtp('');
+                    setMessage('');
+                  }}
+                  className="w-full py-2 text-sm font-bold text-gray-500 hover:text-emerald-700"
+                >
+                  Edit account details
+                </button>
+              </form>
+            )}
 
-            <button type="submit" disabled={isProcessing} className="flex w-full items-center justify-center rounded-xl bg-emerald-600 px-4 py-3.5 text-sm font-semibold text-white transition-all hover:bg-emerald-700 focus:ring-4 focus:ring-emerald-500/20 active:scale-[0.98] disabled:opacity-70">
-              {isProcessing ? "Verifying..." : "Verify & Create Account"}
-            </button>
-
-            <div className="text-center">
-              <button type="button" onClick={() => setStep(1)} className="text-sm font-medium text-gray-500 hover:text-emerald-600">
-                Wrong details? Edit here
-              </button>
-            </div>
-          </form>
-        )}
-
-        {step === 1 && (
-          <p className="mt-8 text-center text-sm text-gray-600">
-            Already have an account?{" "}
-            <Link href="/login" className="font-semibold text-emerald-600 hover:text-emerald-700">
-              Log in
-            </Link>
-          </p>
-        )}
+            {step === 'details' && (
+              <p className="mt-8 text-center text-sm font-medium text-gray-600">
+                Already have an account?{' '}
+                <Link href="/login" className="font-black text-emerald-700 hover:underline">
+                  Log in
+                </Link>
+              </p>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );

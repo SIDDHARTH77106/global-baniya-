@@ -15,65 +15,188 @@ enum Role {
 }
 
 model User {
-  id        String    @id @default(uuid())
-  name      String
-  email     String    @unique
-  phone     String?
-  password  String?
-  otp       String?
-  otpExpiry DateTime?
-  role      Role      @default(CUSTOMER)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id       String   @id @default(uuid())
+  name     String
+  email    String   @unique
+  phone    String?
+  password String?
+  otp      String?
+  role     Role     @default(CUSTOMER)
+  reviews  Reviews[]
+
+  @@map("users")
+}
+
+model ProductType {
+  product_type_id  String            @id @default(uuid())
+  type_name        String            @unique
+  productCategory  ProductCategory[]
+  products         Product[]
+
+  @@map("product_type")
+}
+
+model ProductCategory {
+  product_category_id String            @id @default(uuid())
+  product_type_id     String
+  category_name       String
+  parent_cat_id       String?
+  category_image      String?
+  category_description String?          @db.Text
+  size_category_id    String?
+  productType         ProductType       @relation(fields: [product_type_id], references: [product_type_id], onDelete: Restrict)
+  parentCategory      ProductCategory?  @relation("ProductCategoryHierarchy", fields: [parent_cat_id], references: [product_category_id], onDelete: SetNull)
+  childCategories     ProductCategory[] @relation("ProductCategoryHierarchy")
+  sizeCategory        SizeCategory?     @relation(fields: [size_category_id], references: [size_category_id], onDelete: SetNull)
+
+  @@index([product_type_id])
+  @@index([parent_cat_id])
+  @@index([size_category_id])
+  @@map("product_category")
+}
+
+model Brand {
+  brand_id          String    @id @default(uuid())
+  brand_name        String    @unique
+  brand_description String?   @db.Text
+  products          Product[]
+
+  @@map("brand")
 }
 
 model Product {
-  id          String    @id @default(uuid())
-  shortTitle  String
-  longTitle   String?
-  slug        String    @unique
-  brand       String?
-  description String?   @db.Text
-  category    String?
-  image       String?
-  isActive    Boolean   @default(true)
-  variants    Variant[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  product_id       String             @id @default(uuid())
+  product_type     String
+  product_name     String
+  original_price   Decimal            @db.Decimal(10, 2)
+  sale_price       Decimal?           @db.Decimal(10, 2)
+  product_desc     String?            @db.Text
+  brand_id         String?
+  care_instruction String?            @db.Text
+  about            String?            @db.Text
+  productType      ProductType        @relation(fields: [product_type], references: [product_type_id], onDelete: Restrict)
+  brand            Brand?             @relation(fields: [brand_id], references: [brand_id], onDelete: SetNull)
+  productImages    ProductImage[]
+  reviews          Reviews[]
+  productItems     ProductItem[]
+  productAttributes ProductAttribute[]
 
-  @@index([category])
-  @@index([isActive])
+  @@index([product_type])
+  @@index([brand_id])
+  @@map("product")
 }
 
-model Variant {
-  id          String       @id @default(uuid())
-  productId   String
-  product     Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
-  name        String
-  value       String
-  sortOrder   Int          @default(0)
-  subVariants SubVariant[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+model ProductImage {
+  prod_img_id    String  @id @default(uuid())
+  product_id     String
+  image_filename String
+  product        Product @relation(fields: [product_id], references: [product_id], onDelete: Cascade)
 
-  @@index([productId])
+  @@index([product_id])
+  @@map("product_image")
 }
 
-model SubVariant {
-  id            String   @id @default(uuid())
-  variantId     String
-  variant       Variant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
-  value         String
-  unit          String
-  sku           String   @unique
-  mrp           Decimal  @db.Decimal(10, 2)
-  sellingPrice  Decimal? @db.Decimal(10, 2)
-  currency      String   @default("INR")
-  stockQuantity Int      @default(0)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+model Reviews {
+  reviews_id String   @id @default(uuid())
+  product_id String
+  user_id    String
+  reviews    String   @db.Text
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  date       DateTime
+  product    Product  @relation(fields: [product_id], references: [product_id], onDelete: Cascade)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@index([variantId])
-  @@index([stockQuantity])
+  @@index([product_id])
+  @@index([user_id])
+  @@map("reviews")
+}
+
+model Color {
+  color_id     String        @id @default(uuid())
+  color_name   String        @unique
+  productItems ProductItem[]
+
+  @@map("color")
+}
+
+model ProductItem {
+  product_item_id String           @id @default(uuid())
+  product_id      String
+  color_id        String?
+  original_price  Decimal          @db.Decimal(10, 2)
+  sale_price      Decimal?         @db.Decimal(10, 2)
+  product_code    String           @unique
+  product         Product          @relation(fields: [product_id], references: [product_id], onDelete: Cascade)
+  color           Color?           @relation(fields: [color_id], references: [color_id], onDelete: SetNull)
+  productVariants ProductVariant[]
+
+  @@index([product_id])
+  @@index([color_id])
+  @@map("product_item")
+}
+
+model SizeCategory {
+  size_category_id String            @id @default(uuid())
+  category_name    String            @unique
+  productCategory  ProductCategory[]
+  sizeOptions      SizeOption[]
+
+  @@map("size_category")
+}
+
+model SizeOption {
+  size_id          String           @id @default(uuid())
+  size_name        String
+  size_category_id String
+  sizeCategory     SizeCategory     @relation(fields: [size_category_id], references: [size_category_id], onDelete: Cascade)
+  productVariants  ProductVariant[]
+
+  @@index([size_category_id])
+  @@map("size_option")
+}
+
+model ProductVariant {
+  variant_id      String      @id @default(uuid())
+  product_item_id String
+  size_id         String
+  qty_in_stock    Int         @default(0)
+  productItem     ProductItem @relation(fields: [product_item_id], references: [product_item_id], onDelete: Cascade)
+  sizeOption      SizeOption  @relation(fields: [size_id], references: [size_id], onDelete: Restrict)
+
+  @@index([product_item_id])
+  @@index([size_id])
+  @@index([qty_in_stock])
+  @@map("product_variant")
+}
+
+model AttributeType {
+  attribute_type_id String            @id @default(uuid())
+  attribute_name    String            @unique
+  attributeOptions  AttributeOption[]
+
+  @@map("attribute_type")
+}
+
+model AttributeOption {
+  attribute_option_id   String             @id @default(uuid())
+  attribute_type_id     String
+  attribute_option_name String
+  attributeType         AttributeType      @relation(fields: [attribute_type_id], references: [attribute_type_id], onDelete: Cascade)
+  productAttributes     ProductAttribute[]
+
+  @@index([attribute_type_id])
+  @@map("attribute_option")
+}
+
+model ProductAttribute {
+  product_attribute_id String          @id @default(uuid())
+  product_id           String
+  attribute_option_id  String
+  product              Product         @relation(fields: [product_id], references: [product_id], onDelete: Cascade)
+  attributeOption      AttributeOption @relation(fields: [attribute_option_id], references: [attribute_option_id], onDelete: Cascade)
+
+  @@index([product_id])
+  @@index([attribute_option_id])
+  @@map("product_attribute")
 }

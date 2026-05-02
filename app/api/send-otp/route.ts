@@ -13,15 +13,13 @@ export async function POST(request: Request) {
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
-
     let user = await prisma.user.findUnique({ where: { email } });
 
     if (!user) {
       // Naya User Register ho raha hai
       if (name) {
         user = await prisma.user.create({
-          data: { email, name, otp, otpExpiry }
+          data: { email, name, otp }
         });
       } else {
         return NextResponse.json({ success: false, error: "Is email se koi account nahi mila!" }, { status: 404 });
@@ -30,7 +28,7 @@ export async function POST(request: Request) {
       // Purana user login kar raha hai, OTP update karo
       await prisma.user.update({
         where: { email },
-        data: { otp, otpExpiry }
+        data: { otp }
       });
     }
 
