@@ -14,6 +14,8 @@ const allStores = [
   { id: 5, name: "Daily Needs", price: 30, dist: 0.8, rating: 4.0, time: 12, item: "Maggi 2-Minute Noodles" },
 ];
 
+type StoreListing = (typeof allStores)[number];
+
 export default function SearchPage() {
   const addToCart = useCartStore((state) => state.addToCart);
   const cartCount = useCartStore((state) => state.items.length);
@@ -23,7 +25,7 @@ export default function SearchPage() {
   const [sortBy, setSortBy] = useState('price');
   const [maxDist, setMaxDist] = useState(3);
 
-  const handleAdd = (store: any) => {
+  const handleAdd = (store: StoreListing) => {
     addToCart({
       id: `${store.id}-${store.item}`,
       name: `${store.item} (${store.name})`,
@@ -35,7 +37,7 @@ export default function SearchPage() {
 
   // 🚀 Updated Logic: Ab ye Distance, Sort ke sath-sath Text Search bhi karega
   const sortedStores = useMemo(() => {
-    let filtered = allStores.filter(s => {
+    const filtered = allStores.filter(s => {
       const matchesDistance = s.dist <= maxDist;
       // Search logic: Product ka naam ya Store ka naam match kare
       const matchesSearch = 

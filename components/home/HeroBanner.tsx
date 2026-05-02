@@ -16,7 +16,7 @@ export default function HeroBanner() {
       >
         <div className="lg:w-3/5 space-y-6 text-center lg:text-left">
           <div className="inline-flex items-center gap-2 bg-yellow-400 text-emerald-900 px-4 py-2 rounded-full text-sm font-black shadow-md border border-yellow-300">
-             <Zap className="w-4 h-4" /> Pune's Fastest Quick Commerce!
+             <Zap className="w-4 h-4" /> Pune&apos;s Fastest Quick Commerce!
           </div>
           
           <h1 className="text-5xl md:text-7xl font-extrabold leading-tight tracking-tight text-white">

@@ -13,6 +13,8 @@ export default function WholesalerPayoutsPage() {
         icon={WalletCards}
         title="Wholesaler Payouts"
         description="This route is ready for wholesale payment ledger rows, settlement filters, downloadable statements, and reconciliation actions."
+        eyebrow="Finance"
+        badge="Ledger model pending"
       />
     </DashboardLayout>
   );

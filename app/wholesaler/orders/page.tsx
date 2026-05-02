@@ -13,6 +13,8 @@ export default function WholesalerOrdersPage() {
         icon={ClipboardList}
         title="Wholesale Orders"
         description="This page is ready for bulk order queues, allocation controls, invoice status, and dispatch workflows once order models are added."
+        eyebrow="Operations"
+        badge="Order model pending"
       >
         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 px-5 py-4">

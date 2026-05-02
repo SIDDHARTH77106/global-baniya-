@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Mail } from "lucide-react"; // Shadcn/Lucide icon for premium feel
+import { Mail } from "lucide-react";
 
 export default function EmailOtpPage() {
   const [email, setEmail] = useState("");
@@ -11,16 +11,14 @@ export default function EmailOtpPage() {
   
   // Timer States
   const [timeLeft, setTimeLeft] = useState(30);
-  const [canResend, setCanResend] = useState(false);
   const [isError, setIsError] = useState(false);
+  const canResend = showOtp && timeLeft === 0;
 
   // Timer Logic
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (showOtp && timeLeft > 0) {
-      timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-    } else if (timeLeft === 0) {
-      setCanResend(true);
+      timer = setTimeout(() => setTimeLeft((current) => current - 1), 1000);
     }
     return () => clearTimeout(timer);
   }, [showOtp, timeLeft]);
@@ -41,7 +39,6 @@ export default function EmailOtpPage() {
 
     setShowOtp(true);
     setTimeLeft(30); // Start 30 sec timer
-    setCanResend(false);
   };
 
   // 2. Resend OTP
@@ -49,7 +46,6 @@ export default function EmailOtpPage() {
     console.log("Resending OTP to:", email);
     // API Call again
     setTimeLeft(30);
-    setCanResend(false);
   };
 
   // 3. Verify OTP inside the app
@@ -133,7 +129,7 @@ export default function EmailOtpPage() {
             <div className="text-center mt-4">
               {canResend ? (
                 <p className="text-sm text-gray-500">
-                  Didn't receive the email?{" "}
+                  Did not receive the email?{" "}
                   <button type="button" onClick={handleResendOtp} className="font-semibold text-blue-600 hover:underline">
                     Resend OTP
                   </button>

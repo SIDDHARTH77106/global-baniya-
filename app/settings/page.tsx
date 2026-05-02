@@ -13,6 +13,8 @@ export default function AccountSettingsPage() {
         icon={UserRound}
         title="Account Settings"
         description="This route backs the dashboard account menu and is ready for profile, password, and notification preference forms."
+        eyebrow="Profile"
+        badge="Forms pending"
       />
     </DashboardLayout>
   );

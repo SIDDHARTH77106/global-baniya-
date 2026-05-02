@@ -1,6 +1,6 @@
 'use client';
 
-import { Search, ShoppingCart, User, ChevronDown, X, Menu } from 'lucide-react';
+import { Search, ShoppingCart, User, ChevronDown, X } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -161,7 +161,7 @@ export default function Header() {
                       ))}
                     </ul>
                   ) : (
-                    <div className="p-6 text-center text-gray-500 font-medium">No results found for "{query}"</div>
+                    <div className="p-6 text-center text-gray-500 font-medium">No results found for &quot;{query}&quot;</div>
                   )}
                 </div>
               )}

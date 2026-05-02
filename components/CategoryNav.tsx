@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { 
-  LayoutGrid, Wheat, Droplet, Leaf, Star, Package, 
-  CupSoda, Sparkles, Beaker, Apple, Cake, Droplets, 
-  Home, Baby, Dog, HeartPulse, Flame, Zap, Utensils, 
+  LayoutGrid, Wheat, Droplet, Star, Package, 
+  CupSoda, Sparkles, Beaker, Apple, Droplets, 
+  Baby, Dog, HeartPulse, Flame, Zap, Utensils, 
   Brush, Flower2, Gift
 } from 'lucide-react';
 

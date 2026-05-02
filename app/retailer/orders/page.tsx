@@ -13,6 +13,8 @@ export default function RetailerOrdersPage() {
         icon={ClipboardList}
         title="Retailer Orders"
         description="This page is ready for order queues, fulfillment filters, delivery status changes, and exception handling once the Order model is added."
+        eyebrow="Operations"
+        badge="Order model pending"
       >
         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 px-5 py-4">

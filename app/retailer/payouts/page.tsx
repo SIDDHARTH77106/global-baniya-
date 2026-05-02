@@ -13,6 +13,8 @@ export default function RetailerPayoutsPage() {
         icon={WalletCards}
         title="Retailer Payouts"
         description="This route is ready for payment ledger rows, settlement filters, downloadable statements, and reconciliation actions."
+        eyebrow="Finance"
+        badge="Ledger model pending"
       />
     </DashboardLayout>
   );

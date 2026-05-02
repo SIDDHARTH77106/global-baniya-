@@ -33,6 +33,18 @@ export default function RegisterPage() {
 
   async function handleRegistrationRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const trimmedContact = contact.trim().toLowerCase();
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedContact)) {
+      setMessage({ text: 'Please enter a valid email address so we can send your OTP.', type: 'error' });
+      return;
+    }
+
+    if (password.length < 8) {
+      setMessage({ text: 'Password must be at least 8 characters.', type: 'error' });
+      return;
+    }
+
     setIsSubmitting(true);
     setMessage(null);
 
@@ -40,7 +52,7 @@ export default function RegisterPage() {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, contact, password, role, action: 'request' }),
+        body: JSON.stringify({ name: name.trim(), contact: trimmedContact, password, role, action: 'request' }),
       });
       const data = await response.json();
 
@@ -172,11 +184,12 @@ export default function RegisterPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-sm font-bold text-gray-700">Email or Phone</label>
+                  <label className="mb-1.5 block text-sm font-bold text-gray-700">Email Address</label>
                   <div className="relative">
                     <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
                     <input
                       required
+                      type="email"
                       value={contact}
                       onChange={(event) => setContact(event.target.value)}
                       autoComplete="email"

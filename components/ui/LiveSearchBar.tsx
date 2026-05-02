@@ -1,6 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import { Search, MapPin } from 'lucide-react';
+import { Search } from 'lucide-react';
 import Link from 'next/link';
 
 export default function LiveSearchBar() {
@@ -72,7 +72,7 @@ export default function LiveSearchBar() {
             </ul>
           ) : (
             <div className="p-6 text-center text-gray-500 font-medium">
-              No results found for "{query}"
+              No results found for &quot;{query}&quot;
             </div>
           )}
         </div>

@@ -18,7 +18,7 @@ export default function Footer() {
             </span>
           </div>
           <p className="text-sm text-gray-400 leading-relaxed">
-            Pune's fastest hyper-local e-commerce platform. Connecting you to your trusted neighborhood stores in under 15 minutes.
+            Pune&apos;s fastest hyper-local e-commerce platform. Connecting you to your trusted neighborhood stores in under 15 minutes.
           </p>
           
           {/* App Download Links */}
